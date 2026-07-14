@@ -6,7 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import type { RuntimeUnit } from "../types";
 import { useGame } from "../game/store";
 
-const MODEL_PATHS: Record<string, string> = {
+export const MODEL_PATHS: Record<string, string> = {
   Paladin: "/models/characters/Paladin.glb", BlackKnight: "/models/characters/BlackKnight.glb",
   Witch: "/models/characters/Witch.glb", MagicalGirl: "/models/characters/MagicalGirl.glb",
   Druid: "/models/characters/Druid.glb", Ranger: "/models/characters/Ranger.glb",
@@ -17,7 +17,7 @@ const MODEL_PATHS: Record<string, string> = {
   Skeleton_Warrior: "/models/characters/Skeleton_Warrior.glb", Skeleton_Mage: "/models/characters/Skeleton_Mage.glb",
   Skeleton_Rogue: "/models/characters/Skeleton_Rogue.glb", Skeleton_Minion: "/models/characters/Skeleton_Minion.glb",
 };
-const ANIM_PATHS: Record<string, string> = {
+export const ANIM_PATHS: Record<string, string> = {
   general: "/models/animations/Rig_Medium_General.glb", movement: "/models/animations/Rig_Medium_MovementBasic.glb",
   melee: "/models/animations/Rig_Medium_CombatMelee.glb", ranged: "/models/animations/Rig_Medium_CombatRanged.glb",
 };

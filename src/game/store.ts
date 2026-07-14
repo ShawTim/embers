@@ -7,6 +7,7 @@ import { decideAIAction, type AIDecision } from "./ai";
 import { CHAPTERS } from "../data/gameData";
 import type { Lang } from "../i18n";
 import { t, unitName, chapterInfo } from "../i18n";
+import { getDialogueForTrigger } from "../data/dialogues";
 
 export type Phase = "player" | "enemy" | "combat" | "victory" | "defeat";
 export type SelectionMode = "idle" | "moving" | "actionMenu" | "targeting" | "enemyInfo";
@@ -58,6 +59,9 @@ interface GameState {
   removeDamageNumber: (id: number) => void;
   triggerShake: (amt: number) => void;
   addLog: (text: string, color?: string) => void;
+  activeDialogue: string | null;
+  setDialogue: (id: string | null) => void;
+  clearDialogue: () => void;
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -69,6 +73,7 @@ export const useGame = create<GameState>((set, get) => ({
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
   hitEffects: [], damageNumbers: [], screenShake: 0, activeCombat: null, combatPhase: null,
+  activeDialogue: null,
 
   setLang: (lang) => { if (typeof localStorage !== "undefined") localStorage.setItem("srpg-lang", lang); set({ lang }); },
 
@@ -84,7 +89,8 @@ export const useGame = create<GameState>((set, get) => ({
     for (const e of ch.enemies) {
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], activeCombat: null, combatPhase: null });
+    const preDialogue = getDialogueForTrigger(ch.id, "pre");
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], activeCombat: null, combatPhase: null, activeDialogue: preDialogue });
   },
 
   selectUnit: (u) => {
@@ -244,6 +250,8 @@ export const useGame = create<GameState>((set, get) => ({
   removeDamageNumber: (id) => set(s => ({ damageNumbers: s.damageNumbers.filter(n => n.id !== id) })),
   triggerShake: (amt) => set({ screenShake: amt }),
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
+  setDialogue: (id) => set({ activeDialogue: id }),
+  clearDialogue: () => set({ activeDialogue: null }),
 }));
 
 function checkBattleEnd(set: any, get: any) {
@@ -253,6 +261,18 @@ function checkBattleEnd(set: any, get: any) {
   const lord = s.units.find((u: RuntimeUnit) => u.def.isLord);
   if (!players.length || lord?.isDead) { set({ phase: "defeat", message: t("defeat", get().lang) }); return; }
   const ch = s.chapter; if (!ch) return;
-  if (ch.objectiveType === "route" && !enemies.length) set({ phase: "victory", message: t("victory", get().lang) });
-  else if (ch.objectiveType === "boss") { const boss = s.units.find((u: RuntimeUnit) => u.isBoss); if (boss?.isDead) set({ phase: "victory", message: t("victory", get().lang) }); }
+  if (ch.objectiveType === "route" && !enemies.length) {
+    const vd = getDialogueForTrigger(ch.id, "victory");
+    set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+  }
+  else if (ch.objectiveType === "boss") {
+    const boss = s.units.find((u: RuntimeUnit) => u.isBoss);
+    if (boss?.isDead) {
+      const bd = getDialogueForTrigger(ch.id, "boss_death");
+      const vd = getDialogueForTrigger(ch.id, "victory");
+      // Show boss death dialogue first if exists
+      if (bd && !s.activeDialogue) { set({ activeDialogue: bd }); return; }
+      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+    }
+  }
 }
