@@ -15,12 +15,12 @@ export const ch01_pre: DialogueScript = {
   id: "ch01_pre",
   lines: [
     { speaker: "narrator", text: { en: "The realm of Aetheria has known a hundred years of peace under the Ember Throne. But shadows gather at the borders.", zh: "艾特利亞在 Ember 王座之下享有了百年的和平。但暗影正在邊境聚集。" } },
-    { speaker: "narrator", text: { en: "In the quiet province of Ashwood, young Lord Kael prepares for bed, unaware that this night will change everything.", zh: "在寧靜的 Ashwood 省，年輕的凱爾領主正準備就寢，渾然不知今夜將改變一切。" } },
+    { speaker: "narrator", text: { en: "In the border province of Ashwood, the Black Knight stands watch. He has guarded these lands for years. Tonight, the watch ends.", zh: "在邊境省份 Ashwood，黑騎士佇立守夜。他守護這片土地已有多年。今夜，守望終結。" } },
     { speaker: "kael", text: { en: "Lyra! Borin! To arms — the estate is under attack!", zh: "萊拉！波林！拿起武器——莊園被襲擊了！" }, mood: "surprised" },
     { speaker: "borin", text: { en: "Bandits. A dozen at least. They dare strike at House Ashwood?", zh: "強盜。至少十幾個。他們竟敢襲擊 Ashwood 家族？" }, mood: "angry" },
     { speaker: "lyra", text: { en: "My lord, the villagers are still in the manor. We must not let the enemy past us.", zh: "領主大人，村民們還在宅邸裡。我們不能讓敵人越過防線。" }, mood: "determined" },
     { speaker: "kael", text: { en: "Then we hold the line. For Aetheria! For the Embers!", zh: "那我們就守住防線。為了艾特利亞！為了餘燼！" }, mood: "determined" },
-    { speaker: "boss_garrick", text: { en: "Heh. A boy-lord playing soldier. Kill them all — leave nothing standing!", zh: "呵。一個扮士兵的小鬼領主。殺光他們——一個不留！" }, mood: "angry" },
+    { speaker: "boss_garrick", text: { en: "Heh. The Black Knight of Ashwood. I expected more from the legend.", zh: "呵。Ashwood 的黑騎士。我對傳說期待更高。" }, mood: "angry" },
   ],
 };
 

@@ -10,7 +10,7 @@ But the flame is dimming.
 
 ### Player Party
 
-**Kael Ashwood** (Lord) — Young lord of House Ashwood, a border province. Raised on tales of the Ember Throne's glory, he has never known war until the night his estate burns. Determined, compassionate, carries the weight of leadership he never asked for.
+**Kael Ashwood** (Lord) — The Black Knight of Ashwood. A seasoned warrior-lord, not a boy playing hero. Years of border skirmishes have left him scarred and pragmatic, but his sense of duty burns hotter than any wound. He carries the weight of leadership with quiet resolve, not youthful naivety.
 
 **Lyra Sunweave** (Cleric) — A healer from the Temple of Embers in Valdris. Sent to Ashwood on a routine pilgrimage, she arrives the night of the attack. She harbors a secret: she can sense the Ember Throne's light fading, though she dare not speak it aloud.
 

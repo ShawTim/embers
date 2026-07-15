@@ -120,17 +120,17 @@ export const PROMOTIONS: Record<string, string> = {
 };
 
 export const UNITS: Record<string, UnitDef> = {
-  kael: { id: "kael", name: "Kael", desc: "Young lord of House Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "Rogue", portraitColor: "#3a6ad8" },
+  kael: { id: "kael", name: "Kael", desc: "A seasoned warrior-lord, scarred by years of border conflict. The Black Knight of Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "BlackKnight", portraitColor: "#3a6ad8" },
   lyra: { id: "lyra", name: "Lyra", desc: "Devoted healer.", classId: "cleric", level: 1, faction: "player", growthBonus: { mag: 15, res: 15 }, inventory: ["heal_staff"], modelId: "Witch", portraitColor: "#d8c850" },
   borin: { id: "borin", name: "Borin", desc: "Veteran knight.", classId: "knight", level: 3, faction: "player", growthBonus: { hp: 15, str: 10, def: 15 }, inventory: ["iron_lance"], modelId: "BlackKnight", portraitColor: "#686872" },
-  serra: { id: "serra", name: "Serra", desc: "Sharp-eyed hunter.", classId: "archer", level: 2, faction: "player", growthBonus: { skl: 15, spd: 10 }, inventory: ["iron_bow"], modelId: "MagicalGirl", portraitColor: "#3a8a3a" },
+  serra: { id: "serra", name: "Serra", desc: "Sharp-eyed hunter from the north.", classId: "archer", level: 2, faction: "player", growthBonus: { skl: 15, spd: 10 }, inventory: ["iron_bow"], modelId: "Ranger", portraitColor: "#3a8a3a" },
   bandit_sword: { id: "bandit_sword", name: "Bandit", desc: "Common brigand.", classId: "mercenary", level: 1, faction: "enemy", inventory: ["iron_sword"], modelId: "Skeleton_Warrior", portraitColor: "#8a4a2a" },
   bandit_axe: { id: "bandit_axe", name: "Brigand", desc: "Thug with an axe.", classId: "fighter", level: 2, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Warrior", portraitColor: "#6a3a1a" },
   boss_garrick: { id: "boss_garrick", name: "Garrick the Cruel", desc: "Leader of the Ashwood Bandits.", classId: "fighter", level: 5, faction: "enemy", isBoss: true, growthBonus: { hp: 20, str: 15, def: 10 }, inventory: ["steel_sword"], modelId: "Skeleton_Warrior", portraitColor: "#9a1a1a" },
   umbral_mage: { id: "umbral_mage", name: "Umbral Acolyte", desc: "Cultist with fire magic.", classId: "mage", level: 3, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#5a1a6a" },
   // New recruits
   maren: { id: "maren", name: "Maren", desc: "Arcane scholar.", classId: "mage", level: 4, faction: "player", growthBonus: { mag: 20, spd: 10 }, inventory: ["fire"], modelId: "Druid", portraitColor: "#6a2ada" },
-  darius: { id: "darius", name: "Darius", desc: "Deserting city guard.", classId: "cavalier", level: 5, faction: "player", growthBonus: { hp: 10, str: 10, def: 10 }, inventory: ["iron_lance"], modelId: "AvianSwordsman", portraitColor: "#da8a3a" },
+  darius: { id: "darius", name: "Darius", desc: "Deserting city guard.", classId: "cavalier", level: 5, faction: "player", growthBonus: { hp: 10, str: 10, def: 10 }, inventory: ["iron_lance"], modelId: "Protagonist_A", portraitColor: "#da8a3a" },
   yuki: { id: "yuki", name: "Yuki", desc: "Pegasus rider from the mountain clans.", classId: "cavalier", level: 7, faction: "player", growthBonus: { spd: 20, lck: 15 }, inventory: ["iron_lance"], modelId: "Protagonist_B", portraitColor: "#8ad8da" },
   // Cult enemies
   cultist: { id: "cultist", name: "Cultist", desc: "Fanatical follower of the Endless Night.", classId: "mercenary", level: 4, faction: "enemy", inventory: ["iron_sword"], modelId: "Skeleton_Warrior", portraitColor: "#4a1a4a" },
@@ -139,10 +139,10 @@ export const UNITS: Record<string, UnitDef> = {
   acolyte_veyne: { id: "acolyte_veyne", name: "Acolyte Veyne", desc: "Umbral Cult mid-ranking leader.", classId: "mage", level: 8, faction: "enemy", isBoss: true, growthBonus: { mag: 25, res: 20 }, inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#6a0a6a" },
   cult_captain: { id: "cult_captain", name: "Cult Captain", desc: "Cult field commander.", classId: "mercenary", level: 8, faction: "enemy", isBoss: true, growthBonus: { hp: 20, str: 15, def: 10 }, inventory: ["steel_sword"], modelId: "Skeleton_Warrior", portraitColor: "#5a0a0a" },
   traitor_guard: { id: "traitor_guard", name: "Traitor Guard", desc: "City guard turned traitor.", classId: "knight", level: 7, faction: "enemy", inventory: ["iron_lance"], modelId: "Skeleton_Warrior", portraitColor: "#5a3a1a" },
-  malachar: { id: "malachar", name: "Inquisitor Malachar", desc: "Fallen Throne Guardian. Cult military commander.", classId: "knight", level: 12, faction: "enemy", isBoss: true, growthBonus: { hp: 30, str: 20, def: 25, res: 15 }, inventory: ["silver_sword"], modelId: "BlackKnight", portraitColor: "#1a0a1a" },
+  malachar: { id: "malachar", name: "Inquisitor Malachar", desc: "Fallen Throne Guardian. Cult military commander.", classId: "knight", level: 12, faction: "enemy", isBoss: true, growthBonus: { hp: 30, str: 20, def: 25, res: 15 }, inventory: ["silver_sword"], modelId: "Paladin_with_Helmet", portraitColor: "#1a0a1a" },
   umbral_horror: { id: "umbral_horror", name: "Umbral Horror", desc: "Creature of pure darkness.", classId: "fighter", level: 10, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Minion", portraitColor: "#0a0a1a" },
   void_wraith: { id: "void_wraith", name: "Void Wraith", desc: "Ethereal being from the Umbral realm.", classId: "mage", level: 12, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#1a0a2a" },
-  zethar: { id: "zethar", name: "Lord Zethar", desc: "The Endless Night. First Guardian of the Ember Throne.", classId: "lord", level: 20, faction: "enemy", isBoss: true, growthBonus: { hp: 40, str: 25, mag: 20, skl: 20, spd: 15, def: 25, res: 25 }, inventory: ["silver_sword"], modelId: "BlackKnight", portraitColor: "#000010" },
+  zethar: { id: "zethar", name: "Lord Zethar", desc: "The Endless Night. First Guardian of the Ember Throne.", classId: "lord", level: 20, faction: "enemy", isBoss: true, growthBonus: { hp: 40, str: 25, mag: 20, skl: 20, spd: 15, def: 25, res: 25 }, inventory: ["silver_sword"], modelId: "Vampire", portraitColor: "#000010" },
 };
 
 export const CHAPTERS: ChapterDef[] = [
