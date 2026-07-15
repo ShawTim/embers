@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree, type ObjectMap } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { GLTF } from "three-stdlib";
-import { attachSwingWeapon, animateMelee as swingMelee, applyManualLean, type SwingState } from "./shared/SwingWeapon";
+import { attachSwingWeapon, animateMelee as swingMelee, applyManualLean, type SwingState, type WeaponKind } from "./shared/SwingWeapon";
 import { spawnProjectile, spawnSlashTrail, type ProjectileKind } from "./shared/Projectile";
 import { Ch1CourtyardScene } from "./shared/Ch1Courtyard";
 import { PolishGroup, polishFor, applyRimLight } from "./shared/CharacterPolish";
@@ -63,9 +63,9 @@ const TARGET_HEIGHT = 1.6;
 // gap is small enough that a ~1.5 unit lunge from each side meets
 // roughly at mid-stage, giving a clear "two lines charging at each
 // other" look.
-const HERO_LINE_X = -2.0;
-const VILLAIN_LINE_X = 2.0;
-const RANK_Z = [-1.8, -0.6, 0.6, 1.8];
+const HERO_LINE_X = -2.2;
+const VILLAIN_LINE_X = 2.2;
+const RANK_Z = [-2.1, -0.7, 0.7, 2.1];
 const HERO_SLOTS: [number, number][] = RANK_Z.map((z) => [HERO_LINE_X, z] as [number, number]);
 const VILLAIN_SLOTS: [number, number][] = RANK_Z.map((z) => [VILLAIN_LINE_X, z] as [number, number]);
 
@@ -79,6 +79,8 @@ interface Combatant {
   body: THREE.Group | null;
   lunge: THREE.Group | null;  // container that handles attack lunge offset
   swing: SwingState | null;   // shared swing weapon + manual lean fields
+  weaponKind: WeaponKind;     // drives swing animation + mesh
+  orbColor?: number;          // glow orb color for staff/fire casters
   mixer: THREE.AnimationMixer | null;
   targetRotY: number;
   curRotY: number;
@@ -109,17 +111,25 @@ interface Spark {
   color: THREE.Color;
 }
 
-const HEROES: Array<{ id: string; modelId: keyof typeof MODEL_PATHS; accent: string }> = [
-  { id: "kael", modelId: "Knight", accent: "#3a6ad8" },
-  { id: "borin", modelId: "Knight", accent: "#5a78a0" },
-  { id: "lyra", modelId: "Mage", accent: "#d8c060" },
-  { id: "serra", modelId: "Ranger", accent: "#3aa050" },
+const HEROES: Array<{ id: string; modelId: keyof typeof MODEL_PATHS; accent: string; weaponKind: WeaponKind; orbColor?: number }> = [
+  // Kael — young lord with iron sword
+  { id: "kael",   modelId: "Knight", accent: "#3a6ad8", weaponKind: "sword" },
+  // Borin — veteran knight with iron lance
+  { id: "borin",  modelId: "Knight", accent: "#5a78a0", weaponKind: "lance" },
+  // Lyra — cleric with heal staff
+  { id: "lyra",   modelId: "Mage",   accent: "#d8c060", weaponKind: "staff", orbColor: 0xfff0a0 },
+  // Serra — archer with bow
+  { id: "serra",  modelId: "Ranger", accent: "#3aa050", weaponKind: "bow" },
 ];
-const VILLAINS: Array<{ id: string; modelId: keyof typeof MODEL_PATHS; accent: string; isBoss?: boolean }> = [
-  { id: "garrick", modelId: "Barbarian", accent: "#a02828", isBoss: true },
-  { id: "bandit_a", modelId: "Rogue", accent: "#7a4828" },
-  { id: "umbral", modelId: "Witch", accent: "#5828a0" },
-  { id: "bandit_b", modelId: "Rogue_Hooded", accent: "#643c20" },
+const VILLAINS: Array<{ id: string; modelId: keyof typeof MODEL_PATHS; accent: string; isBoss?: boolean; weaponKind: WeaponKind; orbColor?: number }> = [
+  // Garrick — boss with steel axe (heavy-hitter)
+  { id: "garrick",  modelId: "Barbarian", accent: "#a02828", isBoss: true, weaponKind: "axe" },
+  // Bandit A — mercenary with iron sword
+  { id: "bandit_a", modelId: "Rogue",      accent: "#7a4828", weaponKind: "sword" },
+  // Umbral Acolyte — mage with fire magic
+  { id: "umbral",   modelId: "Witch",      accent: "#5828a0", weaponKind: "fire", orbColor: 0xff5530 },
+  // Bandit B — fighter with iron axe
+  { id: "bandit_b", modelId: "Rogue_Hooded", accent: "#643c20", weaponKind: "axe" },
 ];
 
 // ---- Independent per-character attack schedules -------------------
@@ -141,7 +151,7 @@ export function LandingScene() {
     <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none" }}>
       <Canvas
         shadows
-        camera={{ position: [0, 4.5, 11], fov: 50, near: 0.1, far: 200 }}
+        camera={{ position: [0, 3.4, 9.0], fov: 50, near: 0.1, far: 200 }}
         gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
         onCreated={({ gl }: { gl: THREE.WebGLRenderer }) => gl.setClearColor("#0a0e18")}
       >
@@ -206,21 +216,27 @@ function OrbitCamera() {
   const { camera } = useThree();
   const t = useRef(0);
   useEffect(() => {
-    camera.position.set(0, 3.2, 9.5);
-    camera.lookAt(0, 0.7, 0);
+    camera.position.set(-1.8, 3.0, 8.5);
+    camera.lookAt(-1.8, 0.7, 0);
   }, [camera]);
   useFrame((_, delta) => {
     t.current += delta;
     // Oscillate ±20° around the +Z axis. Slow and never goes
     // behind the back wall.
-    const baseAngle = Math.sin(t.current * 0.18) * 0.35;
-    const r = 9.5;
-    const sway = Math.sin(t.current * 0.4) * 0.25;
-    const height = 3.2 + Math.sin(t.current * 0.22) * 0.25;
-    const x = Math.sin(baseAngle) * r;
-    const z = Math.cos(baseAngle) * r;
+    const baseAngle = Math.sin(t.current * 0.18) * 0.30;
+    const r = 8.5;
+    const sway = Math.sin(t.current * 0.4) * 0.20;
+    const height = 3.0 + Math.sin(t.current * 0.22) * 0.20;
+    // Camera orbits around a target that's offset to the LEFT
+    // of world origin so the heroes (left side, x ≈ -2.2) end up
+    // near the screen center / right, clear of the start-screen
+    // card on the left.
+    const tx = -1.6;
+    const tz = 0;
+    const x = tx + Math.sin(baseAngle) * r;
+    const z = tz + Math.cos(baseAngle) * r;
     camera.position.set(x, height + sway, z);
-    camera.lookAt(0, 0.7, 0);
+    camera.lookAt(tx, 0.7, 0);
   });
   return null;
 }
@@ -485,6 +501,8 @@ function Combatants() {
       body: null,
       lunge: null,
       swing: null,
+      weaponKind: d.weaponKind,
+      orbColor: d.orbColor,
       mixer: null,
       // Initial facing: each hero looks toward the villain line
       // (roughly center of villain slots).
@@ -507,6 +525,8 @@ function Combatants() {
       body: null,
       lunge: null,
       swing: null,
+      weaponKind: d.weaponKind,
+      orbColor: d.orbColor,
       mixer: null,
       // Initial facing: each villain looks toward the hero line.
       targetRotY: -Math.PI / 2,
@@ -730,13 +750,13 @@ function Combatants() {
       // — never our own side.
       const enemyArr = side === "hero" ? villainsRef.current : heroesRef.current;
       const target = Math.floor(attackRng.current() * enemyArr.length);
-      const kind = pickAttackKind(side, i, attackRng.current());
+      const kind = pickAttackKind(c, attackRng.current());
       if (kind === "heal" && side === "hero") {
         // Lyra-style heal: aim at a random ally instead of an enemy
         const ally = (i + 1 + Math.floor(attackRng.current() * (arr.length - 1))) % arr.length;
         dispatchRef.current({ kind: "heal", attacker: i, target: ally } as Event);
       } else {
-        const color = kind === "cast" ? pickCastColor(side, i) : undefined;
+        const color = kind === "cast" ? pickCastColor(c) : undefined;
         dispatchRef.current({ kind: kind as any, side, attacker: i, target, color } as Event);
       }
       const base = kind === "cast" ? 0.75 : kind === "ranged" ? 0.6 : 0.5;
@@ -744,23 +764,25 @@ function Combatants() {
       c.nextAttackAt = t + base + jitter;
     }
   }
-  function pickAttackKind(side: Side, i: number, r: number): "melee" | "cast" | "ranged" | "heal" {
-    // Role-based bias. Lyra (i=2 on hero side) sometimes heals;
-    // Serra (i=3) shoots; Umbral (i=2 on villain side) always casts.
-    if (side === "hero") {
-      if (i === 2 && r < 0.25) return "heal"; // Lyra
-      if (i === 3) return r < 0.7 ? "ranged" : "cast"; // Serra
-    } else {
-      if (i === 2) return "cast"; // Umbral
-      if (i === 0) return r < 0.6 ? "melee" : "cast"; // Garrick heavy
+  function pickAttackKind(c: Combatant, r: number): "melee" | "cast" | "ranged" | "heal" {
+    // Weapon kind drives the action. Physical melee (sword/lance/axe)
+    // → swing. Bow → shoot. Staff/fire → cast. Lyra sometimes heals
+    // instead of casting offensively.
+    if (c.id === "lyra" && r < 0.25) return "heal";
+    switch (c.weaponKind) {
+      case "bow":   return "ranged";
+      case "staff":
+      case "fire":  return "cast";
+      case "sword":
+      case "lance":
+      case "axe":
+      default:      return "melee";
     }
-    if (r < 0.55) return "melee";
-    if (r < 0.85) return "cast";
-    return "ranged";
   }
-  function pickCastColor(side: Side, i: number): string {
-    if (side === "hero") return i === 2 ? "#7adfff" : "#aeefff";
-    return i === 0 ? "#ff2244" : "#ff5530";
+  function pickCastColor(c: Combatant): string {
+    if (c.weaponKind === "staff") return "#7adfff";
+    if (c.id === "garrick") return "#ff2244";
+    return "#ff5530";
   }
 
   function spawnSparksAt(c: Combatant, color: THREE.Color) {
@@ -955,7 +977,7 @@ function LandingActor({
     // visible to rotate. The shared module also tracks a manual lean
     // override so the GLB idle animation can't push the body into a
     // weird pose.
-    combatant.swing = attachSwingWeapon(c, def.id);
+    combatant.swing = attachSwingWeapon(c, combatant.weaponKind, { orbColor: combatant.orbColor });
     // Start idle anim
     if (idleClip) {
       const action = mixer.clipAction(idleClip, c);

@@ -3,9 +3,33 @@ import * as THREE from "three";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { ThreeEvent, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
-import type { RuntimeUnit } from "../types";
+import type { RuntimeUnit, WeaponType } from "../types";
 import { useGame } from "../game/store";
-import { attachSwingWeapon, applyManualLean, animateMelee as swingMelee, type SwingState } from "./shared/SwingWeapon";
+import { attachSwingWeapon, applyManualLean, animateMelee as swingMelee, type SwingState, type WeaponKind } from "./shared/SwingWeapon";
+
+/** Map the data-side WeaponType to the rendering-side WeaponKind. */
+function weaponKindOf(wt: WeaponType | undefined): WeaponKind {
+  switch (wt) {
+    case "lance": return "lance";
+    case "axe":   return "axe";
+    case "bow":   return "bow";
+    case "staff": return "staff";
+    case "fire":  return "fire";
+    case "light": return "staff";
+    case "dark":  return "fire";
+    case "sword":
+    default:      return "sword";
+  }
+}
+function orbColorFor(wt: WeaponType | undefined): number {
+  switch (wt) {
+    case "fire":  return 0xff5530;
+    case "light": return 0xfff5b0;
+    case "dark":  return 0x8030c0;
+    case "staff": return 0xfff0a0;
+    default:      return 0xfff0a0;
+  }
+}
 
 export const MODEL_PATHS: Record<string, string> = {
   Paladin: "/models/characters/Paladin.glb", BlackKnight: "/models/characters/BlackKnight.glb",
@@ -88,11 +112,13 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     const box = new THREE.Box3(); c.traverse((ch: any) => { if (ch instanceof THREE.Mesh && ch.visible) box.expandByObject(ch); });
     const size = box.getSize(new THREE.Vector3()); const center = box.getCenter(new THREE.Vector3()); const s = TARGET_HEIGHT / size.y;
     c.scale.setScalar(s); c.position.set(-center.x * s, -box.min.y * s, -center.z * s);
-    // Attach a stand-alone weapon (sword for melee, staff for casters)
-    // so the melee swing animation has something visible to rotate.
-    // We use unit.uid as the character id; the shared module picks the
-    // right weapon (sword for most, staff for lyra/umbral).
-    swing.current = attachSwingWeapon(c, unit.uid);
+    // Attach a stand-alone weapon so the swing animation has
+    // something visible to rotate. The kind is driven by the
+    // equipped weapon (or the first weapon in the class) so a
+    // knight actually wields a lance, a fighter wields an axe,
+    // an archer wields a bow, etc.
+    const wt: WeaponType | undefined = (unit.equippedWeapon?.type) ?? (unit.weapons?.[0]?.type);
+    swing.current = attachSwingWeapon(c, weaponKindOf(wt), { orbColor: orbColorFor(wt) });
     setCloneObj(c);
   }, [gltf]);
 
@@ -136,11 +162,12 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     if (isAtk) {
       if (pn === "approach") playAnim(ANIM.idleB || ANIM.idle, true, 0.3);
       else if (pn.includes("windup") || pn.includes("strike")) {
-        const wt = unit.classDef.weapons[0];
-        if (wt === "bow") playAnim(ANIM.bowShoot, false, 0.1);
-        else if (wt === "fire" || wt === "thunder") playAnim(ANIM.magicShoot, false, 0.1);
+        const kind: WeaponKind = swing.current?.kind ?? "sword";
+        if (kind === "bow") playAnim(ANIM.bowShoot, false, 0.1);
+        else if (kind === "staff" || kind === "fire") playAnim(ANIM.magicShoot, false, 0.1);
         else {
-          // Physical melee — also run the shared swing so the stand-
+          // Sword / lance / axe — all physical melee. We play the
+          // slash animation and run the shared swing so the stand-
           // alone weapon mesh performs a visible raise + slash + back.
           playAnim(ANIM.attackSlash, false, 0.1);
           if (modelRef.current && lungeGroupRef.current && swing.current) {

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>KayKit Character Gallery — Embers of Aetheria</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0e14; color: #e8eaed; font-family: -apple-system, sans-serif; overflow-y: auto; }
+  h1 { text-align: center; padding: 20px; color: #cca84a; font-size: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .card { background: rgba(20,28,40,0.8); border: 1px solid rgba(60,80,120,0.3); border-radius: 8px; overflow: hidden; cursor: pointer; transition: all 0.2s; }
+  .card:hover { border-color: rgba(100,160,255,0.5); transform: translateY(-2px); }
+  .card canvas { width: 100%; height: 200px; display: block; }
+  .card .name { padding: 8px 12px; font-size: 13px; font-weight: 600; text-align: center; }
+  .card .tag { font-size: 10px; color: #678; text-align: center; padding-bottom: 8px; }
+  .card.player { border-color: rgba(60,120,220,0.3); }
+  .card.enemy { border-color: rgba(220,60,60,0.2); }
+  .card.special { border-color: rgba(220,180,40,0.2); }
+</style>
+</head>
+<body>
+<h1>KayKit Character Gallery — Click to rotate</h1>
+<div class="grid" id="gallery"></div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { SkeletonUtils } from 'three/addons/utils/SkeletonUtils.js';
+
+const MODELS = [
+  { file: "Paladin", tag: "Player — Kael (Lord)", type: "player" },
+  { file: "BlackKnight", tag: "Player — Borin (Knight) / Malachar / Zethar", type: "player" },
+  { file: "Witch", tag: "Player — Lyra (Cleric)", type: "player" },
+  { file: "MagicalGirl", tag: "Player — Serra (Archer)", type: "player" },
+  { file: "Druid", tag: "Player — Maren (Mage)", type: "player" },
+  { file: "AvianSwordsman", tag: "Player — Darius (Cavalier)", type: "player" },
+  { file: "Protagonist_B", tag: "Player — Yuki (Cavalier)", type: "player" },
+  { file: "Protagonist_A", tag: "Alt male protagonist", type: "player" },
+  { file: "Lorekeeper", tag: "Scholar / Librarian", type: "player" },
+  { file: "Ranger", tag: "Archer / Hunter", type: "player" },
+  { file: "Cleric", tag: "Holy healer", type: "player" },
+  { file: "Marksman", tag: "Sniper", type: "player" },
+  { file: "Knight", tag: "Basic knight", type: "player" },
+  { file: "Mage", tag: "Basic mage", type: "player" },
+  { file: "Rogue", tag: "Basic rogue", type: "player" },
+  { file: "Rogue_Hooded", tag: "Hooded rogue", type: "player" },
+  { file: "Barbarian", tag: "Barbarian", type: "player" },
+  { file: "Paladin_with_Helmet", tag: "Paladin w/ helmet", type: "player" },
+  { file: "Skeleton_Warrior", tag: "Enemy — melee", type: "enemy" },
+  { file: "Skeleton_Mage", tag: "Enemy — magic", type: "enemy" },
+  { file: "Skeleton_Rogue", tag: "Enemy — ranged", type: "enemy" },
+  { file: "Skeleton_Minion", tag: "Enemy — fodder", type: "enemy" },
+  { file: "Vampire", tag: "Boss — Vampire", type: "special" },
+  { file: "OrcBrute", tag: "Boss — Orc", type: "special" },
+  { file: "FrostGolem", tag: "Boss — Ice Golem", type: "special" },
+  { file: "Monstrosity", tag: "Boss — Monstrosity", type: "special" },
+  { file: "CombatMech", tag: "Boss — Mech", type: "special" },
+  { file: "Werewolf_Man", tag: "Boss — Werewolf (human)", type: "special" },
+  { file: "Werewolf_Wolf", tag: "Boss — Werewolf (wolf)", type: "special" },
+  { file: "Tiefling", tag: "Demon / Tiefling mage", type: "special" },
+  { file: "PlantWarrior", tag: "Nature warrior", type: "special" },
+  { file: "ToySoldier", tag: "Toy Soldier", type: "special" },
+  { file: "4GTN", tag: "Mystery character", type: "special" },
+  { file: "4GTN_Forgotten", tag: "Mystery (dark)", type: "special" },
+  { file: "Clown", tag: "Clown", type: "special" },
+  { file: "Superhero", tag: "Superhero", type: "special" },
+  { file: "Hiker", tag: "Hiker (modern)", type: "" },
+  { file: "Caveman", tag: "Caveman", type: "" },
+  { file: "Clanker", tag: "Steampunk robot", type: "" },
+  { file: "Robot_One", tag: "Robot A", type: "" },
+  { file: "Robot_Two", tag: "Robot B", type: "" },
+  { file: "Animatronic_Creepy", tag: "Animatronic (creepy)", type: "" },
+  { file: "Animatronic_Normal", tag: "Animatronic (normal)", type: "" },
+  { file: "Helper_A", tag: "NPC — Helper A", type: "" },
+  { file: "Helper_B", tag: "NPC — Helper B", type: "" },
+  { file: "Farmer_A", tag: "NPC — Farmer A", type: "" },
+  { file: "Farmer_B", tag: "NPC — Farmer B", type: "" },
+  { file: "Hoarder", tag: "NPC — Hoarder", type: "" },
+];
+
+const gallery = document.getElementById('gallery');
+const loader = new GLTFLoader();
+const loaded = {};
+
+// Load each model and create a mini viewer
+MODELS.forEach((m, i) => {
+  const card = document.createElement('div');
+  card.className = `card ${m.type}`;
+  card.innerHTML = `<canvas></canvas><div class="name">${m.file}</div><div class="tag">${m.tag}</div>`;
+  gallery.appendChild(card);
+  const canvas = card.querySelector('canvas');
+
+  // Three.js mini scene
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, canvas.clientWidth / 200, 0.1, 100);
+  camera.position.set(0, 1.2, 4);
+  camera.lookAt(0, 0.8, 0);
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setSize(canvas.clientWidth, 200);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  scene.add(new THREE.AmbientLight(0xb0c4de, 0.8));
+  const dl = new THREE.DirectionalLight(0xffe8c0, 1.2); dl.position.set(2, 3, 2); scene.add(dl);
+  const dl2 = new THREE.DirectionalLight(0x6080a0, 0.3); dl2.position.set(-2, 1, -1); scene.add(dl2);
+
+  // Simple auto-rotate
+  let rotY = 0;
+  let dragging = false, lastX = 0;
+
+  canvas.addEventListener('pointerdown', (e) => { dragging = true; lastX = e.clientX; });
+  canvas.addEventListener('pointermove', (e) => { if (dragging) { rotY += (e.clientX - lastX) * 0.01; lastX = e.clientX; } });
+  canvas.addEventListener('pointerup', () => { dragging = false; });
+  canvas.addEventListener('pointerleave', () => { dragging = false; });
+
+  // Load model
+  loader.load(`/models/characters/${m.file}.glb`, (gltf) => {
+    const obj = SkeletonUtils.clone(gltf.scene);
+    // Hide equipment
+    obj.traverse(child => {
+      if (child.isMesh) {
+        const n = child.name.toLowerCase();
+        if (['shield','sword','offhand','bow','staff','wand','dagger','axe','mug','spellbook','crossbow'].some(k => n.includes(k))) {
+          child.visible = false;
+        }
+      }
+    });
+    // Center + scale
+    const box = new THREE.Box3().setFromObject(obj);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const s = 2.5 / Math.max(size.y, 0.01);
+    obj.scale.setScalar(s);
+    obj.position.set(-center.x * s, -box.min.y * s, -center.z * s);
+    scene.add(obj);
+    loaded[i] = obj;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!dragging) rotY += 0.005;
+      if (obj) obj.rotation.y = rotY;
+      renderer.render(scene, camera);
+    }
+    animate();
+  }, undefined, () => {
+    card.querySelector('.name').textContent = m.file + ' (load error)';
+    card.style.opacity = '0.4';
+  });
+});
+</script>
+</body>
+</html>

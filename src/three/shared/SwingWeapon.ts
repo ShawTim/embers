@@ -24,77 +24,180 @@ export const SWING_DUR = 0.5;          // total length of a swing
 export const TARGET_HEIGHT = 1.6;      // same constant the GLBs use
 const SWING_WEAPON_NAME = "swingWeapon";
 
+export type WeaponKind = "sword" | "lance" | "axe" | "bow" | "staff" | "fire";
+
 export interface SwingState {
   weapon: THREE.Object3D | null;
   leanX: number;             // manual body.rotation.x override
   leanZ: number;             // manual body.rotation.z override
+  kind: WeaponKind;          // weapon type (drives animation + mesh)
+  orbColor?: number;         // glow orb color for staff/fire casters
+}
+
+const STEEL = new THREE.MeshStandardMaterial({ color: 0xdde0e8, metalness: 0.9, roughness: 0.2 });
+const WOOD_DARK = new THREE.MeshStandardMaterial({ color: 0x3a1a0a, roughness: 0.9 });
+const WOOD_BROWN = new THREE.MeshStandardMaterial({ color: 0x6e3a18, roughness: 0.7 });
+const GOLD = new THREE.MeshStandardMaterial({ color: 0xc8a850, metalness: 0.7, roughness: 0.3 });
+
+function makeSword(): THREE.Group {
+  const g = new THREE.Group();
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.8, 0.04), STEEL);
+  blade.position.y = 0.4;
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.12, 4), STEEL);
+  tip.position.y = 0.86;
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 0.05), WOOD_BROWN);
+  guard.position.y = 0.04;
+  const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.2, 6), WOOD_DARK);
+  hilt.position.y = -0.08;
+  const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), GOLD);
+  pommel.position.y = -0.2;
+  g.add(blade, tip, guard, hilt, pommel);
+  return g;
+}
+
+function makeLance(): THREE.Group {
+  const g = new THREE.Group();
+  // Long thin shaft + steel spearhead
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 1.6, 6),
+    WOOD_BROWN,
+  );
+  shaft.position.y = 0.6;
+  const head = new THREE.Mesh(
+    new THREE.ConeGeometry(0.07, 0.32, 4),
+    STEEL,
+  );
+  head.position.y = 1.55;
+  // Small flag/streamer just below the head
+  const flag = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.18, 0.22),
+    new THREE.MeshStandardMaterial({ color: 0xaa2030, side: THREE.DoubleSide, roughness: 0.7 }),
+  );
+  flag.position.set(0, 1.3, 0.05);
+  g.add(shaft, head, flag);
+  return g;
+}
+
+function makeAxe(): THREE.Group {
+  const g = new THREE.Group();
+  // Wooden haft
+  const haft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.04, 1.1, 6),
+    WOOD_BROWN,
+  );
+  haft.position.y = 0.5;
+  // Steel axe head — a flat curved blade attached to the side
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.22, 0.06),
+    STEEL,
+  );
+  head.position.set(0.1, 1.0, 0);
+  head.rotation.z = 0.15;
+  // Top spike (back of axe head)
+  const back = new THREE.Mesh(
+    new THREE.ConeGeometry(0.05, 0.18, 4),
+    STEEL,
+  );
+  back.position.set(-0.08, 1.05, 0);
+  back.rotation.z = -0.6;
+  g.add(haft, head, back);
+  return g;
+}
+
+function makeBow(): THREE.Group {
+  const g = new THREE.Group();
+  // Curved bow stave — a thin curved cylinder approximation
+  const stave = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 1.2, 6),
+    WOOD_BROWN,
+  );
+  stave.position.set(0, 0.6, 0);
+  stave.rotation.z = 0.05;
+  // Bowstring
+  const string = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.005, 0.005, 1.15, 4),
+    new THREE.MeshStandardMaterial({ color: 0xeeeec8 }),
+  );
+  string.position.set(0, 0.6, 0.05);
+  string.rotation.z = 0.05;
+  // Nocked arrow (resting on the bow)
+  const arrow = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.9, 4),
+    WOOD_DARK,
+  );
+  arrow.position.set(0.05, 0.45, 0.08);
+  arrow.rotation.z = Math.PI / 2;
+  const arrowHead = new THREE.Mesh(
+    new THREE.ConeGeometry(0.025, 0.08, 4),
+    STEEL,
+  );
+  arrowHead.position.set(0.5, 0.45, 0.08);
+  arrowHead.rotation.z = -Math.PI / 2;
+  g.add(stave, string, arrow, arrowHead);
+  return g;
+}
+
+function makeStaff(orbColor: number): THREE.Group {
+  const g = new THREE.Group();
+  const staff = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.04, 1.4, 6),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.7 }),
+  );
+  staff.position.y = 0.7;
+  const orb = new THREE.Mesh(
+    new THREE.SphereGeometry(0.1, 12, 12),
+    new THREE.MeshStandardMaterial({
+      color: orbColor,
+      emissive: orbColor,
+      emissiveIntensity: 2.0,
+    }),
+  );
+  orb.position.y = 1.45;
+  g.add(staff, orb);
+  return g;
 }
 
 /**
  * Attach a stand-alone weapon to the right hand of the model. Returns
  * a SwingState the caller stores on the combatant.
  *
- * For Lyra and Umbral (casters) we add a staff with a glowing orb.
- * Everyone else gets a sword.
+ * The weapon kind drives BOTH the visible mesh AND the swing/animation
+ * behavior used by the dispatch logic. We pass `kind` explicitly so
+ * every consumer (LandingScene, Unit3D) agrees on the same vocabulary.
+ *
+ * For staff / fire casters we add a glowing orb at the tip.
  *
  * Call this once in the GLB clone useEffect, after the model has
  * been centered and scaled to TARGET_HEIGHT.
  */
-export function attachSwingWeapon(body: THREE.Group, characterId: string): SwingState {
+export function attachSwingWeapon(
+  body: THREE.Group,
+  kind: WeaponKind,
+  opts: { orbColor?: number; leftHand?: boolean } = {},
+): SwingState {
   const weaponGroup = new THREE.Group();
   weaponGroup.name = SWING_WEAPON_NAME;
-  if (characterId === "lyra" || characterId === "umbral") {
-    // Caster staff with a glowing orb at the tip
-    const staff = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.03, 0.04, 1.4, 6),
-      new THREE.MeshStandardMaterial({ color: 0x5a3a1a, roughness: 0.7 }),
-    );
-    staff.position.y = 0.7;
-    const orb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.1, 12, 12),
-      new THREE.MeshStandardMaterial({
-        color: characterId === "lyra" ? 0xfff0a0 : 0xff5530,
-        emissive: characterId === "lyra" ? 0xfff0a0 : 0xff5530,
-        emissiveIntensity: 2.0,
-      }),
-    );
-    orb.position.y = 1.45;
-    weaponGroup.add(staff, orb);
-  } else {
-    // A sword with blade, tip, crossguard, grip, and pommel
-    const blade = new THREE.Mesh(
-      new THREE.BoxGeometry(0.06, 0.8, 0.04),
-      new THREE.MeshStandardMaterial({ color: 0xdde0e8, metalness: 0.9, roughness: 0.2 }),
-    );
-    blade.position.y = 0.4;
-    const tip = new THREE.Mesh(
-      new THREE.ConeGeometry(0.05, 0.12, 4),
-      new THREE.MeshStandardMaterial({ color: 0xdde0e8, metalness: 0.9, roughness: 0.2 }),
-    );
-    tip.position.y = 0.86;
-    const guard = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.05, 0.05),
-      new THREE.MeshStandardMaterial({ color: 0x6e3a18, roughness: 0.7 }),
-    );
-    guard.position.y = 0.04;
-    const hilt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.05, 0.2, 6),
-      new THREE.MeshStandardMaterial({ color: 0x3a1a0a, roughness: 0.9 }),
-    );
-    hilt.position.y = -0.08;
-    const pommel = new THREE.Mesh(
-      new THREE.SphereGeometry(0.06, 8, 8),
-      new THREE.MeshStandardMaterial({ color: 0xc8a850, metalness: 0.7, roughness: 0.3 }),
-    );
-    pommel.position.y = -0.2;
-    weaponGroup.add(blade, tip, guard, hilt, pommel);
+  let mesh: THREE.Group;
+  let orb: number | undefined;
+  switch (kind) {
+    case "lance": mesh = makeLance(); break;
+    case "axe":   mesh = makeAxe(); break;
+    case "bow":   mesh = makeBow(); break;
+    case "staff": mesh = makeStaff(opts.orbColor ?? 0xfff0a0); orb = opts.orbColor ?? 0xfff0a0; break;
+    case "fire":  mesh = makeStaff(opts.orbColor ?? 0xff5530); orb = opts.orbColor ?? 0xff5530; break;
+    case "sword":
+    default:      mesh = makeSword();
   }
-  // Position at the right hand — slightly to the right and forward
-  // so it sits naturally at the model's right side. Same values for
-  // every character so the swing arc looks consistent.
-  weaponGroup.position.set(0.4, 0.6, 0.25);
+  weaponGroup.add(mesh);
+  // Bows are held in the left hand; everything else right hand.
+  if (kind === "bow") {
+    weaponGroup.position.set(-0.4, 0.6, 0.25);
+    weaponGroup.rotation.y = Math.PI; // face the arrow forward
+  } else {
+    weaponGroup.position.set(0.4, 0.6, 0.25);
+  }
   body.add(weaponGroup);
-  return { weapon: weaponGroup, leanX: 0, leanZ: 0 };
+  return { weapon: weaponGroup, leanX: 0, leanZ: 0, kind, orbColor: orb };
 }
 
 /**
