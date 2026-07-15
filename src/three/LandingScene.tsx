@@ -4,6 +4,10 @@ import { Canvas, useFrame, useThree, type ObjectMap } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { GLTF } from "three-stdlib";
+import { attachSwingWeapon, animateMelee as swingMelee, applyManualLean, type SwingState } from "./shared/SwingWeapon";
+import { spawnProjectile, spawnSlashTrail, type ProjectileKind } from "./shared/Projectile";
+import { Ch1CourtyardScene } from "./shared/Ch1Courtyard";
+import { PolishGroup, polishFor, applyRimLight } from "./shared/CharacterPolish";
 
 type GltfScene = GLTF & ObjectMap;
 
@@ -55,11 +59,12 @@ const ANIM = {
 const TARGET_HEIGHT = 1.6;
 
 // ---- Slot layout (8 fighters on a small circular platform) ----
-// Heroes in a line at x = -3.4, villains mirror at x = +3.4. Both sides
-// face each other across the gap. Z varies front-to-back so the camera
-// can see everyone even at a single moment.
-const HERO_LINE_X = -3.4;
-const VILLAIN_LINE_X = 3.4;
+// Heroes in a line at x = -2.0, villains mirror at x = +2.0 — the
+// gap is small enough that a ~1.5 unit lunge from each side meets
+// roughly at mid-stage, giving a clear "two lines charging at each
+// other" look.
+const HERO_LINE_X = -2.0;
+const VILLAIN_LINE_X = 2.0;
 const RANK_Z = [-1.8, -0.6, 0.6, 1.8];
 const HERO_SLOTS: [number, number][] = RANK_Z.map((z) => [HERO_LINE_X, z] as [number, number]);
 const VILLAIN_SLOTS: [number, number][] = RANK_Z.map((z) => [VILLAIN_LINE_X, z] as [number, number]);
@@ -73,12 +78,14 @@ interface Combatant {
   baseY: number;
   body: THREE.Group | null;
   lunge: THREE.Group | null;  // container that handles attack lunge offset
+  swing: SwingState | null;   // shared swing weapon + manual lean fields
   mixer: THREE.AnimationMixer | null;
   targetRotY: number;
   curRotY: number;
   bobAmp: number;
   hpTint: number;       // 0..1 redness flash
   hpTintDecay: number;
+  nextAttackAt: number;  // world time when this character attacks next
 }
 
 interface Spell {
@@ -89,6 +96,7 @@ interface Spell {
   t: number;
   duration: number;
   color: THREE.Color;
+  kind: ProjectileKind;
   onHit?: () => void;
 }
 
@@ -114,111 +122,32 @@ const VILLAINS: Array<{ id: string; modelId: keyof typeof MODEL_PATHS; accent: s
   { id: "bandit_b", modelId: "Rogue_Hooded", accent: "#643c20" },
 ];
 
-// ---- Round-based sync battle --------------------------------------
-// Both sides are lined up. Every `ROUND_DURATION` seconds a new round
-// fires and EVERY character on the field attacks simultaneously. To
-// keep it from being boring, half the attackers use a melee lunge and
-// the other half use a cast/arrow, and the target pairings rotate each
-// round so the same characters aren't always trading blows.
+// ---- Independent per-character attack schedules -------------------
+// Each character has its own cooldown so the two lines attack
+// independently and continuously — no rounds, no sync, no
+// "wait for the other one to finish". A character picks a random
+// action (melee/cast/ranged), targets a random opponent on the
+// opposite line, then waits 0.4-0.9s before its next attack.
 type Event =
   | { kind: "melee"; side: Side; attacker: number; target: number }
   | { kind: "cast"; side: Side; attacker: number; target: number; color: string }
   | { kind: "ranged"; side: Side; attacker: number; target: number }
   | { kind: "heal"; attacker: number; target: number };
 
-const ROUND_DURATION = 1.05;
-const ROUND_COUNT = 4; // 4 attackers per side fire per round
-const NUM_ROUNDS = 12; // total rounds before the cycle restarts
-
-// One pre-computed round: which attackers fire, what kind of attack,
-// and which target they aim at. Heroes ALWAYS target a villain and
-// villains ALWAYS target a hero — never their own side. Target offset
-// rotates per round so the pairings change (Kael vs Garrick, then Kael
-// vs Umbral, then Kael vs Bandit…).
-function buildRounds(): Event[][] {
-  const rng = mulberry32(0xB12D);
-  const rounds: Event[][] = [];
-  for (let r = 0; r < NUM_ROUNDS; r++) {
-    const evts: Event[] = [];
-    const mode = r % 4;
-    // Pairings: hero[i] fights villain[(i + offset) % 4].
-    // Offset rotates so each round the matchups are different.
-    const offset = r % 4;
-    for (let i = 0; i < ROUND_COUNT; i++) {
-      const heroKind = pickKind("hero", i, mode, rng);
-      const villainKind = pickKind("villain", i, mode, rng);
-      // GUARANTEE cross-side: hero attacks villain, villain attacks hero
-      const hTarget = (i + offset) % VILLAINS.length;
-      const vTarget = (i + offset) % HEROES.length;
-      if (heroKind === "heal") {
-        const t = (i + 1) % HEROES.length;
-        evts.push({ kind: "heal", attacker: i, target: t } as Event);
-      } else if (heroKind === "cast") {
-        evts.push({ kind: "cast", side: "hero", attacker: i, target: hTarget, color: heroColor("cast", i) } as Event);
-      } else if (heroKind === "ranged") {
-        evts.push({ kind: "ranged", side: "hero", attacker: i, target: hTarget } as Event);
-      } else if (heroKind === "melee") {
-        evts.push({ kind: "melee", side: "hero", attacker: i, target: hTarget } as Event);
-      }
-      if (villainKind === "cast") {
-        evts.push({ kind: "cast", side: "villain", attacker: i, target: vTarget, color: villainColor("cast", i) } as Event);
-      } else if (villainKind === "ranged") {
-        evts.push({ kind: "ranged", side: "villain", attacker: i, target: vTarget } as Event);
-      } else if (villainKind === "melee") {
-        evts.push({ kind: "melee", side: "villain", attacker: i, target: vTarget } as Event);
-      }
-    }
-    rounds.push(evts);
-  }
-  return rounds;
-}
-function pickKind(side: "hero" | "villain", i: number, mode: number, rng: () => number): "melee" | "cast" | "ranged" | "heal" | null {
-  if (side === "hero" && i === 2) {
-    // Lyra (healer) sometimes heals
-    if (mode === 0 || mode === 2) return "melee";
-    if (rng() < 0.4) return "heal";
-  }
-  if (side === "hero" && i === 3) {
-    // Serra (archer) often shoots
-    if (mode === 1) return "melee";
-    return rng() < 0.7 ? "ranged" : "cast";
-  }
-  if (side === "villain" && i === 2) {
-    // Umbral mage almost always casts
-    return "cast";
-  }
-  if (mode === 0) return "melee";
-  if (mode === 1) return side === "hero" ? "melee" : "cast";
-  if (mode === 2) return side === "hero" ? "cast" : "melee";
-  // mode 3 — mixed
-  if (i % 2 === 0) return "melee";
-  return side === "hero" ? "ranged" : "cast";
-}
-function heroColor(kind: string, i: number): string {
-  if (kind === "cast") return i === 2 ? "#7adfff" : "#aeefff";
-  return "#ffe070";
-}
-function villainColor(kind: string, i: number): string {
-  if (kind === "cast") return "#ff5530";
-  if (i === 0) return "#ff2244"; // Garrick's heavy hits
-  return "#ff7a3a";
-}
-const ROUNDS: Event[][] = buildRounds();
+// Drop the round system entirely. We use per-combatant cooldowns below.
 
 export function LandingScene() {
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none" }}>
       <Canvas
         shadows
-        camera={{ position: [1, 5.5, 11], fov: 42, near: 0.1, far: 200 }}
+        camera={{ position: [0, 4.5, 11], fov: 50, near: 0.1, far: 200 }}
         gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
-        onCreated={({ gl }: { gl: THREE.WebGLRenderer }) => gl.setClearColor("#0a0e16")}
+        onCreated={({ gl }: { gl: THREE.WebGLRenderer }) => gl.setClearColor("#0a0e18")}
       >
         <LandingLighting />
-        <fog attach="fog" args={["#0a0e16", 22, 75]} />
-        <StarField />
-        <FloatingEmbers />
-        <BattleStage />
+        <fog attach="fog" args={["#0a0e18", 22, 65]} />
+        <Ch1CourtyardScene />
         <Suspense fallback={null}>
           <Combatants />
         </Suspense>
@@ -234,25 +163,32 @@ export function LandingScene() {
 function LandingLighting() {
   return (
     <>
-      <ambientLight intensity={0.85} color="#d0dceb" />
+      {/* Soft cool ambient — moonlit night but still readable */}
+      <ambientLight intensity={1.0} color="#8090b0" />
+      <hemisphereLight args={["#a8b8d8", "#3a2a1a", 0.6]} />
+      {/* Strong key light from the moon direction — gives shape */}
       <directionalLight
-        position={[6, 14, -4]}
-        intensity={1.4}
-        color="#ffe8c0"
+        position={[10, 16, -18]}
+        intensity={1.8}
+        color="#d0d8e8"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
         shadow-camera-near={1}
         shadow-camera-far={40}
-        shadow-camera-left={-15}
-        shadow-camera-right={15}
-        shadow-camera-top={15}
-        shadow-camera-bottom={-15}
+        shadow-camera-left={-12}
+        shadow-camera-right={12}
+        shadow-camera-top={12}
+        shadow-camera-bottom={-12}
         shadow-bias={-0.0005}
       />
-      <directionalLight position={[-6, 6, 8]} intensity={0.55} color="#6080a0" />
-      <hemisphereLight args={["#a0b8d8", "#3a2818", 0.4]} />
-      <pointLight position={[0, 3, 0]} intensity={1.4} color="#c08aff" distance={12} decay={1.6} />
+      {/* Fill from camera-back for silhouette readability */}
+      <directionalLight position={[-6, 8, 8]} intensity={0.7} color="#9aa5c0" />
+      {/* Warm torch glow over the fighting area — counter the cold blue */}
+      <pointLight position={[0, 2.5, 0]} intensity={1.8} color="#ff8030" distance={18} decay={1.2} />
+      {/* A second warm light from the right, suggesting an off-screen torch */}
+      <pointLight position={[4, 2, 3]} intensity={1.0} color="#ffaa50" distance={14} decay={1.3} />
+      <pointLight position={[-4, 2, -3]} intensity={0.8} color="#ff7030" distance={12} decay={1.4} />
     </>
   );
 }
@@ -260,22 +196,27 @@ function LandingLighting() {
 // ----------------------------------------------------------------
 // Camera
 // ----------------------------------------------------------------
-// Camera — full 360° orbit so every character gets screen time
+// Camera — slow side-to-side pan within a "good" arc so the floor
+// never dominates the frame and the back wall is always behind the
+// characters. A full 360° orbit makes the camera go behind the wall
+// at some angles, which is bad. We oscillate ±20° around the
+// starting angle instead.
 // ----------------------------------------------------------------
 function OrbitCamera() {
   const { camera } = useThree();
   const t = useRef(0);
   useEffect(() => {
-    camera.position.set(0, 5.5, 12);
-    camera.lookAt(0, 0.8, 0);
+    camera.position.set(0, 3.2, 9.5);
+    camera.lookAt(0, 0.7, 0);
   }, [camera]);
   useFrame((_, delta) => {
     t.current += delta;
-    // Continuous orbit, plus a small bob and a tilt
-    const baseAngle = t.current * 0.28;
-    const r = 12;
-    const sway = Math.sin(t.current * 0.4) * 0.5;
-    const height = 5.5 + Math.sin(t.current * 0.22) * 0.6;
+    // Oscillate ±20° around the +Z axis. Slow and never goes
+    // behind the back wall.
+    const baseAngle = Math.sin(t.current * 0.18) * 0.35;
+    const r = 9.5;
+    const sway = Math.sin(t.current * 0.4) * 0.25;
+    const height = 3.2 + Math.sin(t.current * 0.22) * 0.25;
     const x = Math.sin(baseAngle) * r;
     const z = Math.cos(baseAngle) * r;
     camera.position.set(x, height + sway, z);
@@ -287,96 +228,170 @@ function OrbitCamera() {
 // ----------------------------------------------------------------
 // Battle stage (platform + glowing rune ring)
 // ----------------------------------------------------------------
+// ----------------------------------------------------------------
+// Battle stage — Ch1 "Embers in the Night" courtyard of Ashwood
+// estate. A cobblestone ground with broken wall segments behind,
+// burning torches around the perimeter, and a full moon overhead.
+// ----------------------------------------------------------------
 function BattleStage() {
-  const ringRef = useRef<THREE.Mesh>(null);
-  const ringMat = useRef<THREE.MeshBasicMaterial>(null);
+  // Torches flicker
+  const torch1 = useRef<THREE.PointLight>(null);
+  const torch2 = useRef<THREE.PointLight>(null);
+  const torch3 = useRef<THREE.PointLight>(null);
+  const torch4 = useRef<THREE.PointLight>(null);
   useFrame((state) => {
-    if (ringRef.current) ringRef.current.rotation.y += 0.4 * state.clock.getDelta() / 2;
-    if (ringMat.current) {
-      const pulse = 1.0 + Math.sin(state.clock.elapsedTime * 1.6) * 0.35;
-      ringMat.current.opacity = 0.35 * pulse;
-    }
+    const t = state.clock.elapsedTime;
+    if (torch1.current) torch1.current.intensity = 1.6 + Math.sin(t * 4.1) * 0.4;
+    if (torch2.current) torch2.current.intensity = 1.6 + Math.sin(t * 3.7 + 1.3) * 0.4;
+    if (torch3.current) torch3.current.intensity = 1.6 + Math.sin(t * 4.5 + 2.7) * 0.4;
+    if (torch4.current) torch4.current.intensity = 1.6 + Math.sin(t * 3.3 + 0.5) * 0.4;
   });
-  const R = 5.6;
+  // Torches: position closer to the stage so they're visible behind
+  // the fighting area and not lost in the fog.
+  const torchPositions: [number, number][] = [
+    [-4.5, -3], [4.5, -3], [-4.5, 3], [4.5, 3],
+  ];
   return (
-    <group position={[0, 0, 0]}>
-      {/* Stone disc — top at y=0 */}
-      <mesh position={[0, -0.18, 0]} receiveShadow>
-        <cylinderGeometry args={[R, R + 0.2, 0.36, 56]} />
-        <meshStandardMaterial color="#4a4858" roughness={0.65} metalness={0.2} />
+    <group>
+      {/* Sky dome — dark night */}
+      <mesh>
+        <sphereGeometry args={[80, 16, 16]} />
+        <meshBasicMaterial color="#0c1424" side={THREE.BackSide} />
       </mesh>
-      {/* Golden trim ring at top edge */}
-      <mesh position={[0, 0.0, 0]}>
-        <torusGeometry args={[R, 0.07, 8, 80]} />
-        <meshStandardMaterial color="#d4a850" emissive="#a07020" emissiveIntensity={0.8} metalness={0.85} roughness={0.25} />
+      {/* Full moon — emissive sphere up high */}
+      <mesh position={[12, 14, -16]}>
+        <sphereGeometry args={[3.0, 24, 24]} />
+        <meshBasicMaterial color="#f5f6ff" />
       </mesh>
-      {/* Top inlay */}
-      <mesh position={[0, 0.01, 0]}>
-        <cylinderGeometry args={[R - 0.2, R - 0.2, 0.04, 56]} />
-        <meshStandardMaterial color="#3a3848" roughness={0.5} metalness={0.25} />
+      {/* Soft moon halo */}
+      <mesh position={[12, 14, -16]}>
+        <sphereGeometry args={[4.0, 24, 24]} />
+        <meshBasicMaterial color="#dde2f0" transparent opacity={0.18} depthWrite={false} />
       </mesh>
-      {/* Animated rune ring */}
-      <mesh ref={ringRef} position={[0, 0.04, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[R - 0.6, R - 0.3, 80]} />
-        <meshBasicMaterial ref={ringMat} color="#5aa8ff" transparent opacity={0.4} side={THREE.DoubleSide} depthWrite={false} />
+      <pointLight position={[12, 14, -16]} intensity={1.8} color="#e8ecf6" distance={60} decay={1.3} />
+      {/* Cobblestone ground — extends out to camera */}
+      <mesh position={[0, -0.18, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[40, 40]} />
+        <meshStandardMaterial color="#3a3530" roughness={0.95} metalness={0.0} />
       </mesh>
+      {/* Stone floor detail — slightly raised flagstones in fighting area */}
+      <mesh position={[0, -0.16, 0]} receiveShadow>
+        <cylinderGeometry args={[5.8, 5.8, 0.04, 56]} />
+        <meshStandardMaterial color="#4d4842" roughness={0.7} metalness={0.05} />
+      </mesh>
+      <mesh position={[0, -0.14, 0]} receiveShadow>
+        <cylinderGeometry args={[5.4, 5.4, 0.04, 56]} />
+        <meshStandardMaterial color="#3a3530" roughness={0.85} metalness={0.05} />
+      </mesh>
+      {/* Broken estate wall — back arc behind the fighting area */}
+      <CourtyardWall />
+      {/* Burning torches around the perimeter */}
+      {torchPositions.map(([x, z], i) => (
+        <Torch key={i} pos={[x, z]} lightRef={[torch1, torch2, torch3, torch4][i]} index={i} />
+      ))}
+    </group>
+  );
+}
+
+// A broken stone wall segment — looks like a section of the
+// estate's outer wall. Each segment is a Box with crenellations
+// on top and a few rough stones scattered around its base.
+function WallSegment({ pos, rot, len = 4, height = 2.4 }: { pos: [number, number, number]; rot: number; len?: number; height?: number }) {
+  return (
+    <group position={pos} rotation={[0, rot, 0]}>
+      <mesh position={[0, height / 2, 0]} castShadow receiveShadow>
+        <boxGeometry args={[len, height, 0.4]} />
+        <meshStandardMaterial color="#5a5045" roughness={0.95} />
+      </mesh>
+      {/* Crenellation: 3 small blocks on top */}
+      {[-len / 2 + 0.4, 0, len / 2 - 0.4].map((cx, i) => (
+        <mesh key={i} position={[cx, height + 0.18, 0]} castShadow>
+          <boxGeometry args={[0.6, 0.36, 0.5]} />
+          <meshStandardMaterial color="#5a5045" roughness={0.95} />
+        </mesh>
+      ))}
+      {/* A few small rubble stones at the base */}
+      {[[0.7, 0.12, 0.35], [-0.6, 0.08, 0.4], [0.1, 0.15, -0.4]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]} castShadow>
+          <dodecahedronGeometry args={[0.18, 0]} />
+          <meshStandardMaterial color="#4a4138" roughness={1.0} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function CourtyardWall() {
+  // Wall segments arranged in a C-shape behind the fighting area,
+  // leaving an open gap in the front (camera side) so we can see in.
+  return (
+    <group>
+      <WallSegment pos={[-3, 0, -6]} rot={0} len={5} />
+      <WallSegment pos={[3, 0, -6]} rot={0} len={5} />
+      <WallSegment pos={[-7, 0, -3]} rot={Math.PI / 2} len={5} />
+      <WallSegment pos={[7, 0, -3]} rot={Math.PI / 2} len={5} />
+      {/* A taller section on the right — a small tower */}
+      <group position={[8, 0, 0]}>
+        <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
+          <boxGeometry args={[1.4, 3, 1.4]} />
+          <meshStandardMaterial color="#5a5045" roughness={0.95} />
+        </mesh>
+        {/* Battlements on top */}
+        {[0, 0.5, 1.0].map((z, i) => (
+          <mesh key={i} position={[-0.5, 3.18, z]} castShadow>
+            <boxGeometry args={[0.3, 0.36, 0.3]} />
+            <meshStandardMaterial color="#5a5045" roughness={0.95} />
+          </mesh>
+        ))}
+        {[0, 0.5, 1.0].map((z, i) => (
+          <mesh key={`r-${i}`} position={[0.5, 3.18, z]} castShadow>
+            <boxGeometry args={[0.3, 0.36, 0.3]} />
+            <meshStandardMaterial color="#5a5045" roughness={0.95} />
+          </mesh>
+        ))}
+      </group>
+      {/* Scattered broken masonry around the floor edges */}
+      {[[-7, 0.1, 2], [7, 0.1, 2], [-7, 0.1, -1], [7, 0.1, -1], [0, 0.1, -7], [-4, 0.1, 5], [4, 0.1, 5]].map((p, i) => (
+        <mesh key={i} position={p as [number, number, number]} castShadow>
+          <dodecahedronGeometry args={[0.32, 0]} />
+          <meshStandardMaterial color="#4a4138" roughness={1.0} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+// A burning torch on a wooden pole
+function Torch({ pos, lightRef, index }: { pos: [number, number]; lightRef: React.MutableRefObject<THREE.PointLight | null>; index: number }) {
+  return (
+    <group position={[pos[0], 0, pos[1]]}>
+      {/* Wooden pole */}
+      <mesh position={[0, 0.8, 0]} castShadow>
+        <cylinderGeometry args={[0.06, 0.08, 1.6, 6]} />
+        <meshStandardMaterial color="#3d2a1a" roughness={0.95} />
+      </mesh>
+      {/* Iron bracket */}
+      <mesh position={[0.1, 1.55, 0]} castShadow>
+        <boxGeometry args={[0.18, 0.08, 0.08]} />
+        <meshStandardMaterial color="#2a2a2a" metalness={0.7} roughness={0.4} />
+      </mesh>
+      {/* Flame — emissive sphere */}
+      <mesh position={[0.1, 1.7, 0]}>
+        <sphereGeometry args={[0.18, 8, 8]} />
+        <meshBasicMaterial color="#ffb84a" />
+      </mesh>
+      <mesh position={[0.1, 1.8, 0]}>
+        <sphereGeometry args={[0.1, 8, 8]} />
+        <meshBasicMaterial color="#fff0a0" />
+      </mesh>
+      {/* Point light (registered via ref so BattleStage can flicker it) */}
+      <pointLight ref={lightRef} position={[0.1, 1.8, 0]} intensity={1.6} color="#ff9040" distance={9} decay={1.5} castShadow={false} />
     </group>
   );
 }
 
 // ----------------------------------------------------------------
-// Star field (a dome of twinkling billboarded points)
-// ----------------------------------------------------------------
-function StarField() {
-  const ref = useRef<THREE.Points>(null);
-  const { positions, baseColors, phases, count } = useMemo(() => {
-    const N = 320;
-    const positions = new Float32Array(N * 3);
-    const baseColors = new Float32Array(N * 3);
-    const phases = new Float32Array(N);
-    const rng = mulberry32(0xA57E2D);
-    for (let i = 0; i < N; i++) {
-      const theta = rng() * Math.PI * 2;
-      const phi = Math.acos(1 - 2 * rng());
-      const r = 60 * (0.6 + rng() * 0.4);
-      positions[i * 3 + 0] = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = r * Math.cos(phi) * 0.55 + 6;
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-      const hue = rng();
-      let r2 = 0.95, g2 = 0.95, b2 = 1.0;
-      if (hue < 0.15) { r2 = 1.0; g2 = 0.85; b2 = 0.65; }
-      else if (hue < 0.35) { r2 = 0.7; g2 = 0.85; b2 = 1.0; }
-      const brightness = 0.4 + rng() * 0.6;
-      baseColors[i * 3 + 0] = r2 * brightness;
-      baseColors[i * 3 + 1] = g2 * brightness;
-      baseColors[i * 3 + 2] = b2 * brightness;
-      phases[i] = rng() * Math.PI * 2;
-    }
-    return { positions, baseColors, phases, count: N };
-  }, []);
-  useFrame((state) => {
-    if (!ref.current) return;
-    const attr = ref.current.geometry.attributes.color as THREE.BufferAttribute;
-    const t = state.clock.elapsedTime;
-    for (let i = 0; i < count; i++) {
-      const tw = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.5 + phases[i]));
-      attr.setXYZ(i, baseColors[i * 3] * tw, baseColors[i * 3 + 1] * tw, baseColors[i * 3 + 2] * tw);
-    }
-    attr.needsUpdate = true;
-  });
-  return (
-    <points ref={ref}>
-      <bufferGeometry>
-        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
-        <bufferAttribute attach="attributes-color" args={[baseColors, 3]} />
-      </bufferGeometry>
-      <pointsMaterial size={0.55} sizeAttenuation vertexColors transparent opacity={0.9} depthWrite={false} blending={THREE.AdditiveBlending} />
-    </points>
-  );
-}
-
-// ----------------------------------------------------------------
-// Floating embers (glowing motes drifting upward)
+// Ember sparks (kept from old scene — fits the burning estate)
 // ----------------------------------------------------------------
 function FloatingEmbers() {
   const ref = useRef<THREE.Points>(null);
@@ -458,7 +473,8 @@ function Combatants() {
     [knightGltf, barbarianGltf, mageGltf, rangerGltf, rogueGltf, rogueHGltf, witchGltf],
   );
 
-  // Build combatant entries
+  // Build combatant entries. Each character gets a unique initial
+  // cooldown so they attack at staggered times, not all at once.
   const [heroes] = useState<Combatant[]>(() =>
     HEROES.map((d, i) => ({
       id: d.id,
@@ -468,12 +484,17 @@ function Combatants() {
       baseY: 0,
       body: null,
       lunge: null,
+      swing: null,
       mixer: null,
-      targetRotY: -Math.PI / 2,
-      curRotY: -Math.PI / 2,
+      // Initial facing: each hero looks toward the villain line
+      // (roughly center of villain slots).
+      targetRotY: Math.PI / 2,
+      curRotY: Math.PI / 2,
       bobAmp: 0.025,
       hpTint: 0,
       hpTintDecay: 0,
+      // Stagger initial attacks across the first 2 seconds
+      nextAttackAt: 0.4 + i * 0.45 + Math.random() * 0.5,
     })),
   );
   const [villains] = useState<Combatant[]>(() =>
@@ -485,22 +506,26 @@ function Combatants() {
       baseY: 0,
       body: null,
       lunge: null,
+      swing: null,
       mixer: null,
-      targetRotY: Math.PI / 2,
-      curRotY: Math.PI / 2,
+      // Initial facing: each villain looks toward the hero line.
+      targetRotY: -Math.PI / 2,
+      curRotY: -Math.PI / 2,
       bobAmp: 0.025,
       hpTint: 0,
       hpTintDecay: 0,
+      nextAttackAt: 0.7 + i * 0.45 + Math.random() * 0.5,
     })),
   );
 
-  // For spawning spells / sparks
-  const sceneRef = useRef<THREE.Group | null>(null);
+  // The root group that all projectiles, sparks, and slash trails
+  // are added to. The LandingActor sub-component places characters
+  // under stageRoot, so they live alongside the projectiles.
+  const stageRoot = useRef<THREE.Group | null>(null);
   const activeSpells = useRef<Spell[]>([]);
   const activeSparks = useRef<Spark[]>([]);
-  const cycleStart = useRef(0);
-  const pausedUntil = useRef(0);
-  const lastFiredRound = useRef(-1);
+  // Per-character attack RNG (deterministic but advances each call)
+  const attackRng = useRef(mulberry32(0xA7B1));
 
   // Spell meshes
   const spellGroup = useRef<THREE.Group>(null);
@@ -534,88 +559,126 @@ function Combatants() {
   }
 
   function dispatch(evt: Event) {
+    // Resolve attacker / target from their respective side arrays
+    // (they are always on opposite sides)
+    const side: Side = (evt as any).side ?? "hero";
+    const attackerArr = side === "hero" ? heroesRef.current : villainsRef.current;
+    const targetArr = side === "hero" ? villainsRef.current : heroesRef.current;
     switch (evt.kind) {
       case "melee": {
-        const arr = evt.side === "hero" ? heroesRef.current : villainsRef.current;
-        const a = arr[evt.attacker];
-        const b = arr[evt.target];
+        const a = attackerArr[evt.attacker];
+        const b = targetArr[evt.target];
         if (!a || !b || a === b) return;
         const ax = a.slot[0], az = a.slot[1];
         const bx = b.slot[0], bz = b.slot[1];
         const dx = bx - ax, dz = bz - az;
         const len = Math.max(0.001, Math.hypot(dx, dz));
         const ux = dx / len, uz = dz / len;
-        // Lunge at most 35% of the way to the target — stops well short
-        // of the opposite line, no chance of crossing over.
-        const reach = Math.min(1.8, len * 0.35);
+        const reach = Math.min(1.8, len * 0.45);
         const hitX = ax + ux * reach, hitZ = az + uz * reach;
         a.targetRotY = Math.atan2(ux, uz);
-        animateMelee(a, hitX, hitZ);
-        // Quick impact: hit-react + spark at target
-        setTimeout(() => {
+        faceTarget(a, bx, bz);
+        // Slash trail color depends on the character — heroes get a
+        // bright silver slash, villains get a red one. Boss gets gold.
+        const slashColor = a.id === "garrick"
+          ? new THREE.Color(0xffc850)
+          : a.id === "kael"
+            ? new THREE.Color(0xc8e0ff)
+            : new THREE.Color(0xfff0a0);
+        animateMelee(a, hitX, hitZ, () => {
           if (!b.lunge || !b.lunge.parent) return;
           b.hpTint = 1;
-          spawnSparksAt(b, new THREE.Color(1, 0.85, 0.4));
+          // Glowing arc at the impact point, facing the strike
+          // direction. Rotated so the arc opens away from the
+          // attacker.
+          spawnSlashTrail(stageRoot.current!, new THREE.Vector3(bx, 0, bz), slashColor, 0.4);
+          spawnSparksAt(b, slashColor);
           playAnim(b, ANIM.hitA, false, 0.05);
           setTimeout(() => setIdle(b), 220);
-        }, 110);
-        setTimeout(() => setIdle(a), 320);
+        });
+        setTimeout(() => setIdle(a), 360);
         break;
       }
       case "cast": {
-        const arr = evt.side === "hero" ? heroesRef.current : villainsRef.current;
-        const a = arr[evt.attacker];
-        const b = arr[evt.target];
+        const a = attackerArr[evt.attacker];
+        const b = targetArr[evt.target];
         if (!a || !b) return;
         const start = worldPos(a).clone().add(new THREE.Vector3(0, 1.2, 0));
         const end = worldPos(b).clone().add(new THREE.Vector3(0, 1.0, 0));
         const color = new THREE.Color(evt.color);
-        activeSpells.current.push({
-          pos: start.clone(), vel: new THREE.Vector3(), start, end,
-          t: 0, duration: 0.35, color,
-          onHit: () => {
+        // Determine projectile kind from the attacker. Heroes (Lyra)
+        // and Serra use a magic bolt, Umbral uses a fireball. Most
+        // villains use a fireball. Anyone with garrick uses a fireball.
+        let kind: ProjectileKind = "fireball";
+        if (a.id === "lyra" || a.id === "serra") kind = "spark";
+        else if (a.id === "garrick") kind = "fireball";
+        else if (a.id === "umbral") kind = "fireball";
+        else kind = "fireball";
+        a.targetRotY = Math.atan2(end.x - a.slot[0], end.z - a.slot[1]);
+        faceTarget(a, end.x, end.z);
+        playAnim(a, ANIM.magicShoot, false, 0.08);
+        spawnProjectile({
+          parent: stageRoot.current!,
+          start,
+          end,
+          color,
+          kind,
+          duration: kind === "fireball" ? 0.5 : 0.4,
+          onImpact: () => {
             b.hpTint = 1;
             spawnSparksAt(b, color);
             playAnim(b, ANIM.hitA, false, 0.05);
             setTimeout(() => setIdle(b), 220);
           },
         });
-        a.targetRotY = Math.atan2(end.x - a.slot[0], end.z - a.slot[1]);
-        playAnim(a, ANIM.magicShoot, false, 0.08);
-        setTimeout(() => setIdle(a), 320);
+        setTimeout(() => setIdle(a), 360);
         break;
       }
       case "ranged": {
-        const arr = evt.side === "hero" ? heroesRef.current : villainsRef.current;
-        const a = arr[evt.attacker];
-        const b = arr[evt.target];
+        const a = attackerArr[evt.attacker];
+        const b = targetArr[evt.target];
         if (!a || !b) return;
+        // Determine the arrow color. Heroes shoot green arrows,
+        // villains shoot dull red. Serra (hero archer) and any
+        // villain archer get the arrow shape.
+        const color = a.id === "serra"
+          ? new THREE.Color(0x7aff80)
+          : new THREE.Color(0xff7060);
         const start = worldPos(a).clone().add(new THREE.Vector3(0, 1.0, 0));
         const end = worldPos(b).clone().add(new THREE.Vector3(0, 0.8, 0));
         a.targetRotY = Math.atan2(end.x - a.slot[0], end.z - a.slot[1]);
+        faceTarget(a, end.x, end.z);
         playAnim(a, ANIM.bowShoot, false, 0.08);
+        // Small lead time before the arrow leaves the bow
         setTimeout(() => {
-          activeSpells.current.push({
-            pos: start.clone(), vel: new THREE.Vector3(), start, end,
-            t: 0, duration: 0.25, color: new THREE.Color("#a0ff80"),
-            onHit: () => {
+          spawnProjectile({
+            parent: stageRoot.current!,
+            start,
+            end,
+            color,
+            kind: "arrow",
+            duration: 0.28,
+            onImpact: () => {
               b.hpTint = 1;
-              spawnSparksAt(b, new THREE.Color("#a0ff80"));
+              spawnSparksAt(b, color);
               playAnim(b, ANIM.hitA, false, 0.05);
               setTimeout(() => setIdle(b), 220);
             },
           });
         }, 110);
-        setTimeout(() => setIdle(a), 320);
+        setTimeout(() => setIdle(a), 360);
         break;
       }
       case "heal": {
-        const a = heroesRef.current[evt.attacker];
-        const b = heroesRef.current[evt.target];
+        // Heal targets an ally on the same side. attackerArr is the
+        // hero array (heals only happen for heroes).
+        const a = attackerArr[evt.attacker];
+        const b = attackerArr[evt.target];
         if (!a || !b || a === b) return;
         playAnim(a, ANIM.magicShoot, false, 0.08);
         const end = worldPos(b).clone().add(new THREE.Vector3(0, 0.9, 0));
         a.targetRotY = Math.atan2(b.slot[0] - a.slot[0], b.slot[1] - a.slot[1]);
+        faceTarget(a, b.slot[0], b.slot[1]);
         setTimeout(() => {
           for (let i = 0; i < 7; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -625,48 +688,79 @@ function Combatants() {
             spawnSpark(p0, v, new THREE.Color("#3aff90"), 0.7);
           }
         }, 150);
-        setTimeout(() => setIdle(a), 320);
+        setTimeout(() => setIdle(a), 360);
         break;
       }
     }
   }
 
-  function animateMelee(c: Combatant, hitX: number, hitZ: number) {
-    if (!c.body || !c.lunge) return;
-    // Fast lunge: 0..0.18s step forward to hit, 0.18..0.32s bounce back
-    const dur = 0.32;
-    const sx = c.slot[0], sz = c.slot[1];
-    const t0 = performance.now();
-    const tick = () => {
-      const t = (performance.now() - t0) / 1000;
-      const k = Math.min(1, t / dur);
-      let x: number, z: number;
-      if (k < 0.55) {
-        const u = k / 0.55;
-        const e = 1 - Math.pow(1 - u, 3); // ease-out cubic
-        x = sx + (hitX - sx) * e;
-        z = sz + (hitZ - sz) * e;
-      } else {
-        const u = (k - 0.55) / 0.45;
-        const e = 1 - Math.pow(1 - u, 2);
-        x = hitX + (sx - hitX) * e;
-        z = hitZ + (sz - hitZ) * e;
-      }
-      if (c.lunge) {
-        c.lunge.position.x = x - sx;
-        c.lunge.position.z = z - sz;
-      }
-      if (k < 1) requestAnimationFrame(tick);
-      else if (c.lunge) {
-        c.lunge.position.x = 0;
-        c.lunge.position.z = 0;
-      }
-    };
-    tick();
+  function animateMelee(c: Combatant, hitX: number, hitZ: number, onImpact?: () => void) {
+    if (!c.body || !c.lunge || !c.swing) return;
+    swingMelee({
+      body: c.body,
+      lunge: c.lunge,
+      slot: c.slot,
+      hitX,
+      hitZ,
+      state: c.swing,
+      onImpact,
+    });
+  }
+
+  function faceTarget(c: Combatant, targetX: number, targetZ: number) {
+    if (!c.body) return;
+    const wp = new THREE.Vector3();
+    c.body.getWorldPosition(wp);
+    c.body.lookAt(targetX, wp.y, targetZ);
   }
 
   function worldPos(c: Combatant) {
     return new THREE.Vector3(c.slot[0], 0, c.slot[1]);
+  }
+
+  // Per-character independent scheduler. Called every frame for each
+  // side. For every character whose cooldown has elapsed, fire an
+  // event and reschedule.
+  function triggerDueAttacks(arr: Combatant[], side: Side, t: number) {
+    for (let i = 0; i < arr.length; i++) {
+      const c = arr[i];
+      if (!c.body) continue;
+      if (t < c.nextAttackAt) continue;
+      // Pick an action. Target is the OPPOSITE side's combatant array
+      // — never our own side.
+      const enemyArr = side === "hero" ? villainsRef.current : heroesRef.current;
+      const target = Math.floor(attackRng.current() * enemyArr.length);
+      const kind = pickAttackKind(side, i, attackRng.current());
+      if (kind === "heal" && side === "hero") {
+        // Lyra-style heal: aim at a random ally instead of an enemy
+        const ally = (i + 1 + Math.floor(attackRng.current() * (arr.length - 1))) % arr.length;
+        dispatchRef.current({ kind: "heal", attacker: i, target: ally } as Event);
+      } else {
+        const color = kind === "cast" ? pickCastColor(side, i) : undefined;
+        dispatchRef.current({ kind: kind as any, side, attacker: i, target, color } as Event);
+      }
+      const base = kind === "cast" ? 0.75 : kind === "ranged" ? 0.6 : 0.5;
+      const jitter = (attackRng.current() - 0.5) * 0.4;
+      c.nextAttackAt = t + base + jitter;
+    }
+  }
+  function pickAttackKind(side: Side, i: number, r: number): "melee" | "cast" | "ranged" | "heal" {
+    // Role-based bias. Lyra (i=2 on hero side) sometimes heals;
+    // Serra (i=3) shoots; Umbral (i=2 on villain side) always casts.
+    if (side === "hero") {
+      if (i === 2 && r < 0.25) return "heal"; // Lyra
+      if (i === 3) return r < 0.7 ? "ranged" : "cast"; // Serra
+    } else {
+      if (i === 2) return "cast"; // Umbral
+      if (i === 0) return r < 0.6 ? "melee" : "cast"; // Garrick heavy
+    }
+    if (r < 0.55) return "melee";
+    if (r < 0.85) return "cast";
+    return "ranged";
+  }
+  function pickCastColor(side: Side, i: number): string {
+    if (side === "hero") return i === 2 ? "#7adfff" : "#aeefff";
+    return i === 0 ? "#ff2244" : "#ff5530";
   }
 
   function spawnSparksAt(c: Combatant, color: THREE.Color) {
@@ -723,15 +817,16 @@ function Combatants() {
     for (const arr of [heroesRef.current, villainsRef.current]) {
       for (const c of arr) {
         if (!c.body) continue;
-        // The model itself is the body (gets bob & rotation). The lunge
-        // group is its parent — we use that for the attack lunge offset
-        // so the bob doesn't fight the lunge.
         c.body.position.y = Math.sin(t * 1.4 + c.phase) * c.bobAmp;
+        // Smooth turn toward target rotation
         let diff = c.targetRotY - c.curRotY;
         diff = ((diff + Math.PI) % (Math.PI * 2)) - Math.PI;
         c.curRotY += diff * Math.min(1, delta * 8);
         c.body.rotation.y = c.curRotY;
         if (c.mixer) c.mixer.update(delta);
+        // Apply manual lean AFTER the mixer so the GLB idle animation
+        // cannot push the body into a weird pose (e.g. -π headstand).
+        if (c.swing) applyManualLean(c.body, c.swing.leanX, c.swing.leanZ);
         if (c.hpTint > 0) {
           c.hpTint = Math.max(0, c.hpTint - delta * 2.2);
           c.body.traverse((ch) => {
@@ -742,41 +837,17 @@ function Combatants() {
       }
     }
 
-    if (t < pausedUntil.current) return;
-    const localT = t - cycleStart.current;
-    const currentRound = Math.floor(localT / ROUND_DURATION);
-    const withinRound = localT - currentRound * ROUND_DURATION;
-    // Fire all events for the current round as soon as the round starts
-    // (within the first 80ms) so every character animates at the same time
-    if (currentRound < ROUNDS.length && currentRound !== lastFiredRound.current) {
-      lastFiredRound.current = currentRound;
-      const round = ROUNDS[currentRound];
-      for (const evt of round) dispatchRef.current(evt);
-    }
-    // Once we've played all rounds, the cycle restarts on its own
-    if (currentRound >= ROUNDS.length) {
-      cycleStart.current = t;
-      pausedUntil.current = t;
-      lastFiredRound.current = -1;
-    }
+    // Independent per-character attack schedule. Each character has
+    // its own cooldown; as soon as t crosses nextAttackAt, the
+    // character attacks and we schedule its next one 0.4-0.9s later.
+    // This gives a continuous, desynced brawl.
+    triggerDueAttacks(heroesRef.current, "hero", t);
+    triggerDueAttacks(villainsRef.current, "villain", t);
 
-    for (let i = activeSpells.current.length - 1; i >= 0; i--) {
-      const s = activeSpells.current[i];
-      s.t += delta;
-      const p = Math.min(1, s.t / s.duration);
-      const mid = new THREE.Vector3().addVectors(s.start, s.end).multiplyScalar(0.5);
-      mid.y += 1.4;
-      const u = 1 - p;
-      s.pos.copy(s.start).multiplyScalar(u * u)
-        .add(mid.clone().multiplyScalar(2 * u * p))
-        .add(s.end.clone().multiplyScalar(p * p));
-      if (p >= 1) {
-        spawnSparks(s.end, s.color);
-        s.onHit?.();
-        activeSpells.current.splice(i, 1);
-      }
-    }
-
+    // Projectiles animate themselves via the shared module's
+    // requestAnimationFrame loop, so there's no per-frame work to do
+    // here for them. We only need to update sparks (debris from
+    // impacts).
     for (let i = activeSparks.current.length - 1; i >= 0; i--) {
       const sp = activeSparks.current[i];
       sp.life += delta;
@@ -795,7 +866,7 @@ function Combatants() {
   });
 
   return (
-    <group ref={sceneRef}>
+    <group ref={stageRoot}>
       <group ref={spellGroup}>
         <SpellRenderer spells={activeSpells} />
       </group>
@@ -848,8 +919,14 @@ function LandingActor({
     c.traverse((ch: any) => {
       if (ch instanceof THREE.Mesh) {
         const n = ch.name.toLowerCase();
-        if (["shield","sword","offhand","bow","staff","wand","dagger","axe","mug","spellbook","crossbow"].some(k => n.includes(k))) ch.visible = false;
-        else { ch.castShadow = true; ch.receiveShadow = true; }
+        // Hide only secondary gear (offhand, mug, spellbook). Keep the
+        // primary weapon visible so it can be animated during attacks.
+        if (["offhand","mug","spellbook","crossbow"].some(k => n.includes(k))) {
+          ch.visible = false;
+        } else {
+          ch.castShadow = true;
+          ch.receiveShadow = true;
+        }
       }
     });
     // Faction tint: add a slight emissive based on accent
@@ -874,22 +951,73 @@ function LandingActor({
     combatant.lunge = lungeRef.current;
     combatant.mixer = mixer;
     combatant.slot = slot;
+    // Attach a stand-alone weapon so the swing animation has something
+    // visible to rotate. The shared module also tracks a manual lean
+    // override so the GLB idle animation can't push the body into a
+    // weird pose.
+    combatant.swing = attachSwingWeapon(c, def.id);
     // Start idle anim
     if (idleClip) {
       const action = mixer.clipAction(idleClip, c);
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.fadeIn(0.3).play();
     }
-    // Boss crown
+    // Boss crown — a glowing golden ring + cone. Emissive intensity
+    // is high so the crown stays bright in the dim courtyard, instead
+    // of reading as a black silhouette.
     if (def.isBoss) {
-      const crown = new THREE.Mesh(
-        new THREE.ConeGeometry(0.18, 0.28, 6),
-        new THREE.MeshStandardMaterial({ color: "gold", metalness: 0.95, roughness: 0.15, emissive: "gold", emissiveIntensity: 0.5 }),
+      const crownGroup = new THREE.Group();
+      // A small spiked ring
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(0.18, 0.04, 6, 16),
+        new THREE.MeshStandardMaterial({
+          color: "#ffcc44",
+          emissive: "#ffaa22",
+          emissiveIntensity: 1.6,
+          metalness: 0.8,
+          roughness: 0.2,
+        }),
       );
-      crown.position.set(0, TARGET_HEIGHT + 0.25, 0);
-      crown.castShadow = true;
-      lungeRef.current.add(crown);
+      ring.position.set(0, TARGET_HEIGHT + 0.05, 0);
+      ring.rotation.x = Math.PI / 2;
+      crownGroup.add(ring);
+      // Three small spikes on top
+      for (let i = 0; i < 4; i++) {
+        const ang = (i / 4) * Math.PI * 2;
+        const spike = new THREE.Mesh(
+          new THREE.ConeGeometry(0.04, 0.16, 4),
+          new THREE.MeshStandardMaterial({
+            color: "#ffcc44",
+            emissive: "#ffaa22",
+            emissiveIntensity: 1.4,
+            metalness: 0.9,
+            roughness: 0.2,
+          }),
+        );
+        spike.position.set(
+          Math.cos(ang) * 0.18,
+          TARGET_HEIGHT + 0.12,
+          Math.sin(ang) * 0.18,
+        );
+        crownGroup.add(spike);
+      }
+      // Inner glow — emissive sphere so the crown reads from far away
+      const glow = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25, 16, 12),
+        new THREE.MeshBasicMaterial({
+          color: "#ffcc44",
+          transparent: true,
+          opacity: 0.25,
+          depthWrite: false,
+        }),
+      );
+      glow.position.set(0, TARGET_HEIGHT + 0.05, 0);
+      crownGroup.add(glow);
+      lungeRef.current.add(crownGroup);
     }
+    // Boost the model's emissive so the polished character reads
+    // clearly even in the dim courtyard. Cheap fresnel-rim stand-in.
+    if (c) applyRimLight(c, new THREE.Color(def.accent));
     return () => {
       mixer.stopAllAction();
       c.parent?.remove(c);
@@ -897,7 +1025,9 @@ function LandingActor({
   }, [gltf, def.accent, def.isBoss, combatant, slot, idleClip]);
   return (
     <group ref={groupRef} position={[slot[0], 0, slot[1]]}>
-      <group ref={lungeRef} />
+      <group ref={lungeRef}>
+        <PolishGroup spec={polishFor(def.id)} />
+      </group>
     </group>
   );
 }

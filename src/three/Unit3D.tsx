@@ -5,6 +5,7 @@ import { ThreeEvent, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import type { RuntimeUnit } from "../types";
 import { useGame } from "../game/store";
+import { attachSwingWeapon, applyManualLean, animateMelee as swingMelee, type SwingState } from "./shared/SwingWeapon";
 
 export const MODEL_PATHS: Record<string, string> = {
   Paladin: "/models/characters/Paladin.glb", BlackKnight: "/models/characters/BlackKnight.glb",
@@ -39,6 +40,7 @@ function Placeholder({ unit }: { unit: RuntimeUnit }) {
 
 function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const groupRef = useRef<THREE.Group>(null);
+  const lungeGroupRef = useRef<THREE.Group>(null);
   const modelRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
@@ -52,6 +54,11 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const targetRotY = useRef(0);
   const curRotY = useRef(0);
   const prevHp = useRef(unit.hp);
+  // Shared swing state (weapon mesh + manual lean override). The
+  // attack animation (attackSlash) sets leanX/leanZ; the useFrame
+  // here applies them after the mixer so the GLB idle animation
+  // can't push the body into a weird pose.
+  const swing = useRef<SwingState | null>(null);
   const prevActed = useRef(unit.hasActed);
   const [dead, setDead] = useState(false);
   const [cloneObj, setCloneObj] = useState<THREE.Object3D | null>(null);
@@ -76,11 +83,16 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const clips = { ...Object.fromEntries([...animGeneral.animations, ...animMovement.animations, ...animMelee.animations, ...animRanged.animations].map(c => [c.name, c])) };
 
   useEffect(() => {
-    const c = cloneSkeleton(gltf.scene);
+    const c = cloneSkeleton(gltf.scene) as THREE.Group;
     c.traverse((ch: any) => { if (ch instanceof THREE.Mesh) { const n = ch.name.toLowerCase(); if (["shield","sword","offhand","bow","staff","wand","dagger","axe","mug","spellbook","crossbow"].some(k => n.includes(k))) ch.visible = false; else { ch.castShadow = true; ch.receiveShadow = true; } } });
     const box = new THREE.Box3(); c.traverse((ch: any) => { if (ch instanceof THREE.Mesh && ch.visible) box.expandByObject(ch); });
     const size = box.getSize(new THREE.Vector3()); const center = box.getCenter(new THREE.Vector3()); const s = TARGET_HEIGHT / size.y;
     c.scale.setScalar(s); c.position.set(-center.x * s, -box.min.y * s, -center.z * s);
+    // Attach a stand-alone weapon (sword for melee, staff for casters)
+    // so the melee swing animation has something visible to rotate.
+    // We use unit.uid as the character id; the shared module picks the
+    // right weapon (sword for most, staff for lyra/umbral).
+    swing.current = attachSwingWeapon(c, unit.uid);
     setCloneObj(c);
   }, [gltf]);
 
@@ -123,7 +135,31 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     const pn = combatPhase.phase;
     if (isAtk) {
       if (pn === "approach") playAnim(ANIM.idleB || ANIM.idle, true, 0.3);
-      else if (pn.includes("windup") || pn.includes("strike")) { const wt = unit.classDef.weapons[0]; if (wt === "bow") playAnim(ANIM.bowShoot, false, 0.1); else if (wt === "fire" || wt === "thunder") playAnim(ANIM.magicShoot, false, 0.1); else playAnim(ANIM.attackSlash, false, 0.1); }
+      else if (pn.includes("windup") || pn.includes("strike")) {
+        const wt = unit.classDef.weapons[0];
+        if (wt === "bow") playAnim(ANIM.bowShoot, false, 0.1);
+        else if (wt === "fire" || wt === "thunder") playAnim(ANIM.magicShoot, false, 0.1);
+        else {
+          // Physical melee — also run the shared swing so the stand-
+          // alone weapon mesh performs a visible raise + slash + back.
+          playAnim(ANIM.attackSlash, false, 0.1);
+          if (modelRef.current && lungeGroupRef.current && swing.current) {
+            // Run a lunge toward the defender's position (visual only;
+            // the real hit is handled by the combat system).
+            const len = Math.max(0.001, Math.hypot(other.pos.x - unit.pos.x, other.pos.y - unit.pos.y));
+            const ux = (other.pos.x - unit.pos.x) / len, uz = (other.pos.y - unit.pos.y) / len;
+            const reach = Math.min(0.8, len * 0.3);
+            swingMelee({
+              body: modelRef.current,
+              lunge: lungeGroupRef.current,
+              slot: [unit.pos.x, unit.pos.y],
+              hitX: unit.pos.x + ux * reach,
+              hitZ: unit.pos.y + uz * reach,
+              state: swing.current,
+            });
+          }
+        }
+      }
       else if (pn.includes("recoil") || pn.includes("recovery")) playAnim(ANIM.idle, true, 0.2);
     } else {
       if (pn === "approach") playAnim(ANIM.idle, true, 0.3);
@@ -143,6 +179,13 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
 
   useFrame((state, delta) => {
     if (mixerRef.current) mixerRef.current.update(delta);
+    // Apply the manual lean override so the GLB idle animation can't
+    // push the body into a weird pose (e.g. -π headstand). The
+    // shared melee animation writes to swing.current.leanX/Z; here we
+    // force the body rotation after the mixer so the override sticks.
+    if (swing.current && modelRef.current) {
+      applyManualLean(modelRef.current, swing.current.leanX, swing.current.leanZ);
+    }
     const gs = useGame.getState();
     const hTile = gs.hoveredTile; const mRange = gs.moveRange;
     if (groupRef.current && isSelected && gs.selectionMode === "moving" && !moveFrom.current && hTile) {
@@ -167,7 +210,9 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     <group ref={groupRef} position={[unit.pos.x, 0, unit.pos.y]}>
       <mesh position={[0, 0.02, 0]} rotation={[-Math.PI/2, 0, 0]}><circleGeometry args={[0.42, 32]} /><meshBasicMaterial color={factionColor} transparent opacity={unit.isBoss ? 0.6 : 0.35} /></mesh>
       <mesh ref={ringRef} position={[0, 0.06, 0]} rotation={[-Math.PI/2, 0, 0]} visible={isSelected || hovered || inAttackRange}><ringGeometry args={[0.44, 0.5, 32]} /><meshBasicMaterial color={inAttackRange ? "#ff3333" : isSelected ? "#55aaff" : "#aaffee"} transparent opacity={0.9} side={THREE.DoubleSide} /></mesh>
-      <group ref={modelRef}>{cloneObj && <primitive object={cloneObj} />}</group>
+      <group ref={lungeGroupRef}>
+        <group ref={modelRef}>{cloneObj && <primitive object={cloneObj} />}</group>
+      </group>
       {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#ff0000" transparent opacity={0.25} depthWrite={false} /></mesh>}
       {isExhausted && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} /></mesh>}
       {unit.isBoss && <mesh position={[0, TARGET_HEIGHT + 0.3, 0]}><coneGeometry args={[0.15, 0.25, 6]} /><meshStandardMaterial color="gold" metalness={0.9} roughness={0.2} emissive="gold" emissiveIntensity={0.3} /></mesh>}

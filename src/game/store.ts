@@ -82,7 +82,29 @@ export const useGame = create<GameState>((set, get) => ({
     const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
     for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
     const units: RuntimeUnit[] = [];
-    const playerIds = ["kael", "lyra", "borin", "serra"];
+    const playerIdsByChapter: Record<string, string[]> = {
+      ch01: ["kael", "lyra", "borin"],
+      ch02: ["kael", "lyra", "borin", "serra"],
+      ch03: ["kael", "lyra", "borin", "serra", "maren"],
+      ch04: ["kael", "lyra", "borin", "serra", "maren"],
+      ch05: ["kael", "lyra", "borin", "serra", "maren"],
+      ch06: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch07: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch08: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch09: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch10: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch11: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch12: ["kael", "lyra", "borin", "serra", "maren", "darius"],
+      ch13: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch14: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch15: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch16: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch17: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch18: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch19: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+      ch20: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
+    };
+    const playerIds = playerIdsByChapter[ch.id] || ["kael", "lyra", "borin", "serra"];
     for (let j = 0; j < playerIds.length && j < ch.deploymentPoints.length; j++) {
       const u = createUnit(playerIds[j], ch.deploymentPoints[j]); units.push(u); grid.placeUnit(u, ch.deploymentPoints[j]);
     }
