@@ -8,10 +8,10 @@ import { MODEL_PATHS } from "../three/Unit3D";
 // Map unit def.id to modelId for portraits
 const UNIT_MODELS: Record<string, string> = {
   kael: "BlackKnight", lyra: "Witch", borin: "Paladin", serra: "Ranger",
-  bandit_sword: "Skeleton_Warrior", bandit_axe: "Skeleton_Warrior",
-  boss_garrick: "Skeleton_Warrior", umbral_mage: "Skeleton_Mage",
   maren: "Druid", darius: "Protagonist_A", yuki: "Protagonist_B",
-  cultist: "Skeleton_Warrior", cultist_heavy: "Skeleton_Warrior", cult_archer: "Skeleton_Rogue",
+  bandit_sword: "Skeleton_Warrior", bandit_axe: "Barbarian",
+  boss_garrick: "Skeleton_Warrior", umbral_mage: "Skeleton_Mage",
+  cultist: "Skeleton_Warrior", cultist_heavy: "Barbarian", cult_archer: "Skeleton_Rogue",
   acolyte_veyne: "Skeleton_Mage", cult_captain: "Skeleton_Warrior", traitor_guard: "Skeleton_Warrior",
   malachar: "Paladin_with_Helmet", umbral_horror: "Skeleton_Minion", void_wraith: "Skeleton_Mage",
   zethar: "Vampire", narrator: "",
