@@ -1,6 +1,6 @@
 import { useGame } from "../game/store";
 import { posKey } from "../game/grid";
-import { t } from "../i18n";
+import { t, unitName, className, factionName } from "../i18n";
 import { ITEMS } from "../data/gameData";
 import { useState } from "react";
 
@@ -51,19 +51,16 @@ export function ActionMenu() {
   };
 
   const style: React.CSSProperties = { left: "50%", top: "55%", transform: "translateX(-50%)" };
+  const tt = (k: any) => t(k, lang);
+  const itemName = (id: string) => { const k = `i_${id}` as any; const r = t(k, lang); return r === k ? id : r; };
 
   if (submenu === "item") {
+    const items = convoy.filter(c => c.type === "item");
     return (
       <div className="action-menu" style={style}>
-        <button onClick={() => setSubmenu("main")} disabled={false}>↩ {t("cancel", lang)}</button>
-        {convoy.filter(c => c.type === "item").map((c, i) => {
-          const item = ITEMS[c.id];
-          if (!item) return null;
-          return <button key={i} onClick={() => { useItemAction(c.id); setSubmenu("main"); }}>
-            {item.name} ({c.uses})
-          </button>;
-        })}
-        {convoy.filter(c => c.type === "item").length === 0 && <button disabled>No items</button>}
+        <button onClick={() => setSubmenu("main")}>↩ {tt("cancel")}</button>
+        {items.map((c, i) => { const item = ITEMS[c.id]; if (!item) return null; return <button key={i} onClick={() => { useItemAction(c.id); setSubmenu("main"); }}>{itemName(c.id)} ({c.uses} {tt("uses")})</button>; })}
+        {items.length === 0 && <button disabled>{tt("noItems")}</button>}
       </div>
     );
   }
@@ -71,26 +68,25 @@ export function ActionMenu() {
   if (submenu === "equip") {
     return (
       <div className="action-menu" style={style}>
-        <button onClick={() => setSubmenu("main")}>↩ {t("cancel", lang)}</button>
+        <button onClick={() => setSubmenu("main")}>↩ {tt("cancel")}</button>
         {selectedUnit.weapons.map((w, i) => (
-          <button key={i} onClick={() => { equipWeaponAction(i); setSubmenu("main"); }}
-            style={w === selectedUnit.equippedWeapon ? { color: "#6c6" } : {}}>
-            {w === selectedUnit.equippedWeapon ? "✓ " : ""}{w.name} MT{w.might}
+          <button key={i} onClick={() => { equipWeaponAction(i); setSubmenu("main"); }} style={w === selectedUnit.equippedWeapon ? { color: "#6c6" } : {}}>
+            {w === selectedUnit.equippedWeapon ? "✓ " : ""}{w.name} {tt("might")}{w.might}
           </button>
         ))}
-        {selectedUnit.weapons.length <= 1 && <button disabled>Only one weapon</button>}
+        {selectedUnit.weapons.length <= 1 && <button disabled>{tt("onlyOneWeapon")}</button>}
       </div>
     );
   }
 
   return (
     <div className="action-menu" style={style}>
-      {canAttack && <button onClick={onAttack}>⚔ {t("attack", lang)}</button>}
-      {canHeal && <button onClick={onHeal}>✚ {t("heal", lang)}</button>}
-      <button onClick={() => setSubmenu("item")}>🎒 Item</button>
-      {selectedUnit.weapons.length > 1 && <button onClick={() => setSubmenu("equip")}>🗡 Equip</button>}
-      <button onClick={waitUnit}>⏳ {t("wait", lang)}</button>
-      <button onClick={cancelMove}>↩ {t("cancel", lang)}</button>
+      {canAttack && <button onClick={onAttack}>⚔ {tt("attack")}</button>}
+      {canHeal && <button onClick={onHeal}>✚ {tt("heal")}</button>}
+      <button onClick={() => setSubmenu("item")}>🎒 {tt("item")}</button>
+      {selectedUnit.weapons.length > 1 && <button onClick={() => setSubmenu("equip")}>🗡 {tt("equip")}</button>}
+      <button onClick={waitUnit}>⏳ {tt("wait")}</button>
+      <button onClick={cancelMove}>↩ {tt("cancel")}</button>
     </div>
   );
 }

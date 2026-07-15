@@ -101,6 +101,43 @@ const STRINGS = {
   hintAllActed: { en: "All units acted — click End Turn", zh: "所有單位已行動 — 點擊結束回合" },
   nextChapter: { en: "Next Chapter", zh: "下一章" },
   playAgain: { en: "Play Again", zh: "再玩一次" },
+  // Action Menu extra
+  item: { en: "Item", zh: "道具" },
+  equip: { en: "Equip", zh: "裝備" },
+  noItems: { en: "No items", zh: "沒有道具" },
+  onlyOneWeapon: { en: "Only one weapon", zh: "只有一把武器" },
+  // Item names
+  i_vulnerary: { en: "Vulnerary", zh: "傷藥" },
+  i_elixir: { en: "Elixir", zh: "萬靈藥" },
+  i_master_seal: { en: "Master Seal", zh: "大師封印" },
+  i_str_ring: { en: "Strength Ring", zh: "力量指環" },
+  i_spd_ring: { en: "Speed Ring", zh: "速度指環" },
+  i_def_ring: { en: "Defense Ring", zh: "防禦指環" },
+  // Item desc
+  uses: { en: "uses", zh: "次" },
+  // Weapon labels
+  might: { en: "MT", zh: "威力" },
+  weight: { en: "WT", zh: "重量" },
+  range: { en: "RNG", zh: "距離" },
+  level: { en: "Lv", zh: "等級" },
+  exp: { en: "EXP", zh: "經驗" },
+  growth: { en: "Growth", zh: "成長率" },
+  classLabel: { en: "Class", zh: "職業" },
+  faction: { en: "Faction", zh: "陣營" },
+  // Stats screen
+  statsTitle: { en: "Character Stats", zh: "角色能力" },
+  attackPower: { en: "ATK", zh: "攻擊" },
+  attackSpeed: { en: "AS", zh: "攻速" },
+  avoid: { en: "AVO", zh: "迴避" },
+  hitRate: { en: "HIT", zh: "命中" },
+  critRate: { en: "CRT", zh: "必殺" },
+  // Inventory
+  inventory: { en: "Inventory", zh: "物品欄" },
+  convoy: { en: "Convoy", zh: "倉庫" },
+  equipped: { en: "Equipped", zh: "裝備中" },
+  promote: { en: "Promote", zh: "轉職" },
+  cantPromote: { en: "Requires Lv10+", zh: "需要等級10+" },
+  alreadyPromoted: { en: "Already promoted", zh: "已轉職" },
 };
 
 export type StringKey = keyof typeof STRINGS;
