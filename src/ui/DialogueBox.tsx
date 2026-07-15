@@ -7,7 +7,7 @@ import { MODEL_PATHS } from "../three/Unit3D";
 
 // Map unit def.id to modelId for portraits
 const UNIT_MODELS: Record<string, string> = {
-  kael: "Ranger", lyra: "Witch", borin: "BlackKnight", serra: "MagicalGirl",
+  kael: "Rogue", lyra: "Witch", borin: "BlackKnight", serra: "MagicalGirl",
   bandit_sword: "Skeleton_Warrior", bandit_axe: "Skeleton_Warrior",
   boss_garrick: "Skeleton_Warrior", umbral_mage: "Skeleton_Mage",
 };

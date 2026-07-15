@@ -35,14 +35,52 @@ export function isPassable(terrain: TerrainType, moveType: MoveType): boolean {
 }
 
 export const WEAPONS: Record<string, WeaponDef> = {
-  iron_sword:  { id: "iron_sword",  name: "Iron Sword",  desc: "Standard steel sword.",            type: "sword", triangle: "sword", rank: 1, might: 5,  hit: 90, weight: 5, crit: 0, minRange: 1, maxRange: 1, uses: 45 },
-  steel_sword: { id: "steel_sword", name: "Steel Sword", desc: "Heavier, harder-hitting.",         type: "sword", triangle: "sword", rank: 2, might: 8,  hit: 75, weight: 8, crit: 0, minRange: 1, maxRange: 1, uses: 30 },
-  silver_sword:{ id: "silver_sword",name: "Silver Sword",desc: "Masterwork blade.",                type: "sword", triangle: "sword", rank: 3, might: 13, hit: 75, weight: 6, crit: 0, minRange: 1, maxRange: 1, uses: 20 },
-  iron_lance:  { id: "iron_lance",  name: "Iron Lance",  desc: "Cavalry and knight weapon.",       type: "lance", triangle: "lance", rank: 1, might: 6,  hit: 85, weight: 6, crit: 0, minRange: 1, maxRange: 1, uses: 45 },
-  iron_axe:    { id: "iron_axe",    name: "Iron Axe",    desc: "Heavy-hitting but inaccurate.",    type: "axe",   triangle: "axe",   rank: 1, might: 7,  hit: 70, weight: 7, crit: 0, minRange: 1, maxRange: 1, uses: 45 },
-  iron_bow:    { id: "iron_bow",    name: "Iron Bow",    desc: "Ranged. Effective vs flying.",     type: "bow",   triangle: "none",  rank: 1, might: 5,  hit: 80, weight: 5, crit: 0, minRange: 2, maxRange: 2, uses: 45, effective: { vs: ["flying"], multiplier: 3 } },
-  fire:        { id: "fire",        name: "Fire",        desc: "Basic anima fire magic.",          type: "fire",  triangle: "anima", rank: 1, might: 5,  hit: 90, weight: 4, crit: 0, minRange: 1, maxRange: 2, uses: 40 },
-  heal_staff:  { id: "heal_staff",  name: "Heal",        desc: "Restores HP to adjacent ally.",    type: "staff", triangle: "none",  rank: 1, might: 8,  hit: 100,weight: 2, crit: 0, minRange: 1, maxRange: 1, uses: 45 },
+  // === Swords ===
+  iron_sword:   { id: "iron_sword",   name: "Iron Sword",   desc: "Standard steel sword.",            type: "sword", triangle: "sword", rank: 1, might: 5,  hit: 90, weight: 5, crit: 0,  minRange: 1, maxRange: 1, uses: 45 },
+  steel_sword:  { id: "steel_sword",  name: "Steel Sword",  desc: "Heavier, harder-hitting.",         type: "sword", triangle: "sword", rank: 2, might: 8,  hit: 75, weight: 8, crit: 0,  minRange: 1, maxRange: 1, uses: 30 },
+  silver_sword: { id: "silver_sword", name: "Silver Sword", desc: "Masterwork blade.",                type: "sword", triangle: "sword", rank: 3, might: 13, hit: 75, weight: 6, crit: 0,  minRange: 1, maxRange: 1, uses: 20 },
+  slim_sword:   { id: "slim_sword",   name: "Slim Sword",   desc: "Light and easy to wield.",         type: "sword", triangle: "sword", rank: 1, might: 3,  hit: 100,weight: 2, crit: 0,  minRange: 1, maxRange: 1, uses: 50 },
+  brave_sword:  { id: "brave_sword",  name: "Brave Sword",  desc: "Always strikes twice.",            type: "sword", triangle: "sword", rank: 3, might: 9,  hit: 75, weight: 7, crit: 0,  minRange: 1, maxRange: 1, uses: 30, brave: true },
+  killing_edge: { id: "killing_edge", name: "Killing Edge", desc: "High critical rate.",              type: "sword", triangle: "sword", rank: 2, might: 6,  hit: 75, weight: 5, crit: 30, minRange: 1, maxRange: 1, uses: 20 },
+  rapier:       { id: "rapier",       name: "Rapier",       desc: "Lord's blade. Effective vs armor.", type: "sword", triangle: "sword", rank: 1, might: 7,  hit: 95, weight: 3, crit: 10, minRange: 1, maxRange: 1, uses: 40, effective: { vs: ["armored"], multiplier: 2 } },
+
+  // === Lances ===
+  iron_lance:   { id: "iron_lance",   name: "Iron Lance",   desc: "Standard lance.",                  type: "lance", triangle: "lance", rank: 1, might: 6,  hit: 85, weight: 6, crit: 0,  minRange: 1, maxRange: 1, uses: 45 },
+  steel_lance:  { id: "steel_lance",  name: "Steel Lance",  desc: "Heavier lance.",                   type: "lance", triangle: "lance", rank: 2, might: 9,  hit: 70, weight: 9, crit: 0,  minRange: 1, maxRange: 1, uses: 30 },
+  silver_lance: { id: "silver_lance", name: "Silver Lance", desc: "Masterwork lance.",                type: "lance", triangle: "lance", rank: 3, might: 14, hit: 70, weight: 7, crit: 0,  minRange: 1, maxRange: 1, uses: 20 },
+  slim_lance:   { id: "slim_lance",   name: "Slim Lance",   desc: "Light lance.",                     type: "lance", triangle: "lance", rank: 1, might: 4,  hit: 95, weight: 3, crit: 0,  minRange: 1, maxRange: 1, uses: 50 },
+  javelin:      { id: "javelin",      name: "Javelin",      desc: "Throwable lance. Range 1-2.",      type: "lance", triangle: "lance", rank: 1, might: 5,  hit: 70, weight: 7, crit: 0,  minRange: 1, maxRange: 2, uses: 20 },
+
+  // === Axes ===
+  iron_axe:     { id: "iron_axe",     name: "Iron Axe",     desc: "Heavy-hitting but inaccurate.",    type: "axe",   triangle: "axe",   rank: 1, might: 7,  hit: 70, weight: 7, crit: 0,  minRange: 1, maxRange: 1, uses: 45 },
+  steel_axe:    { id: "steel_axe",    name: "Steel Axe",    desc: "Even heavier.",                    type: "axe",   triangle: "axe",   rank: 2, might: 10, hit: 60, weight: 10,crit: 0,  minRange: 1, maxRange: 1, uses: 30 },
+  silver_axe:   { id: "silver_axe",   name: "Silver Axe",   desc: "Masterwork axe.",                  type: "axe",   triangle: "axe",   rank: 3, might: 15, hit: 60, weight: 8, crit: 0,  minRange: 1, maxRange: 1, uses: 20 },
+  hand_axe:     { id: "hand_axe",     name: "Hand Axe",     desc: "Throwable. Range 1-2.",            type: "axe",   triangle: "axe",   rank: 1, might: 6,  hit: 60, weight: 8, crit: 0,  minRange: 1, maxRange: 2, uses: 20 },
+  killer_axe:   { id: "killer_axe",   name: "Killer Axe",   desc: "High critical.",                   type: "axe",   triangle: "axe",   rank: 2, might: 8,  hit: 60, weight: 7, crit: 35, minRange: 1, maxRange: 1, uses: 20 },
+
+  // === Bows ===
+  iron_bow:     { id: "iron_bow",     name: "Iron Bow",     desc: "Standard bow. Effective vs flying.",type: "bow",  triangle: "none",  rank: 1, might: 5,  hit: 80, weight: 5, crit: 0,  minRange: 2, maxRange: 2, uses: 45, effective: { vs: ["flying"], multiplier: 3 } },
+  steel_bow:    { id: "steel_bow",    name: "Steel Bow",    desc: "Heavier bow.",                     type: "bow",   triangle: "none",  rank: 2, might: 8,  hit: 70, weight: 7, crit: 0,  minRange: 2, maxRange: 2, uses: 30, effective: { vs: ["flying"], multiplier: 3 } },
+  silver_bow:   { id: "silver_bow",   name: "Silver Bow",   desc: "Masterwork bow.",                  type: "bow",   triangle: "none",  rank: 3, might: 12, hit: 70, weight: 5, crit: 0,  minRange: 2, maxRange: 2, uses: 20, effective: { vs: ["flying"], multiplier: 3 } },
+  short_bow:    { id: "short_bow",    name: "Short Bow",    desc: "Light bow. Can counter at range 1.",type: "bow",  triangle: "none",  rank: 1, might: 4,  hit: 90, weight: 3, crit: 0,  minRange: 1, maxRange: 2, uses: 40, effective: { vs: ["flying"], multiplier: 3 } },
+
+  // === Magic — Anima ===
+  fire:         { id: "fire",         name: "Fire",         desc: "Basic anima magic.",               type: "fire",  triangle: "anima", rank: 1, might: 5,  hit: 90, weight: 4, crit: 0,  minRange: 1, maxRange: 2, uses: 40 },
+  elfire:       { id: "elfire",       name: "Elfire",       desc: "Advanced fire magic.",             type: "fire",  triangle: "anima", rank: 2, might: 10, hit: 85, weight: 6, crit: 0,  minRange: 1, maxRange: 2, uses: 25 },
+  fimbulvetr:   { id: "fimbulvetr",   name: "Fimbulvetr",   desc: "Devastating ice magic.",           type: "fire",  triangle: "anima", rank: 3, might: 15, hit: 80, weight: 8, crit: 0,  minRange: 1, maxRange: 2, uses: 15 },
+
+  // === Magic — Light ===
+  lightning:    { id: "lightning",    name: "Lightning",    desc: "Basic light magic.",               type: "light", triangle: "light", rank: 1, might: 4,  hit: 95, weight: 3, crit: 0,  minRange: 1, maxRange: 2, uses: 40 },
+  divinus:      { id: "divinus",      name: "Divinus",      desc: "Advanced light magic.",            type: "light", triangle: "light", rank: 2, might: 9,  hit: 90, weight: 5, crit: 0,  minRange: 1, maxRange: 2, uses: 25 },
+
+  // === Magic — Dark ===
+  flux:         { id: "flux",         name: "Flux",         desc: "Basic dark magic.",                type: "dark",  triangle: "dark",  rank: 1, might: 6,  hit: 80, weight: 5, crit: 0,  minRange: 1, maxRange: 2, uses: 35 },
+  nosferatu:    { id: "nosferatu",    name: "Nosferatu",    desc: "Dark magic that heals the caster.",type: "dark",  triangle: "dark",  rank: 2, might: 7,  hit: 75, weight: 8, crit: 0,  minRange: 1, maxRange: 2, uses: 20 },
+
+  // === Staves ===
+  heal_staff:   { id: "heal_staff",   name: "Heal",         desc: "Restores HP to adjacent ally.",    type: "staff", triangle: "none",  rank: 1, might: 8,  hit: 100,weight: 2, crit: 0,  minRange: 1, maxRange: 1, uses: 45 },
+  mend_staff:   { id: "mend_staff",   name: "Mend",         desc: "Restores more HP.",                type: "staff", triangle: "none",  rank: 2, might: 15, hit: 100,weight: 2, crit: 0,  minRange: 1, maxRange: 1, uses: 30 },
+  physic_staff: { id: "physic_staff", name: "Physic",       desc: "Heals at range 1-2.",              type: "staff", triangle: "none",  rank: 2, might: 10, hit: 100,weight: 3, crit: 0,  minRange: 1, maxRange: 2, uses: 25 },
 };
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -82,7 +120,7 @@ export const PROMOTIONS: Record<string, string> = {
 };
 
 export const UNITS: Record<string, UnitDef> = {
-  kael: { id: "kael", name: "Kael", desc: "Young lord of House Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "Ranger", portraitColor: "#3a6ad8" },
+  kael: { id: "kael", name: "Kael", desc: "Young lord of House Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "Rogue", portraitColor: "#3a6ad8" },
   lyra: { id: "lyra", name: "Lyra", desc: "Devoted healer.", classId: "cleric", level: 1, faction: "player", growthBonus: { mag: 15, res: 15 }, inventory: ["heal_staff"], modelId: "Witch", portraitColor: "#d8c850" },
   borin: { id: "borin", name: "Borin", desc: "Veteran knight.", classId: "knight", level: 3, faction: "player", growthBonus: { hp: 15, str: 10, def: 15 }, inventory: ["iron_lance"], modelId: "BlackKnight", portraitColor: "#686872" },
   serra: { id: "serra", name: "Serra", desc: "Sharp-eyed hunter.", classId: "archer", level: 2, faction: "player", growthBonus: { skl: 15, spd: 10 }, inventory: ["iron_bow"], modelId: "MagicalGirl", portraitColor: "#3a8a3a" },
