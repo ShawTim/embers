@@ -312,3 +312,311 @@ export function makeCobbleMaterial(): THREE.MeshStandardMaterial {
     metalness: 0.05,
   });
 }
+
+// ---------------------------------------------------------------------------
+//  Grass / sand / dirt textures for the SRPG tile map. These are
+//  tile-aligned and use small repeats so a single grass tile looks
+//  like a chunk of meadow rather than a continuous pattern.
+// ---------------------------------------------------------------------------
+let grassColorMap: THREE.CanvasTexture | null = null;
+export function getGrassColorMap(): THREE.CanvasTexture {
+  if (grassColorMap) return grassColorMap;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  // Base — deep grass green
+  ctx.fillStyle = "#2e5026";
+  ctx.fillRect(0, 0, size, size);
+  // Tufts of grass — many small dark/light strokes
+  for (let i = 0; i < 200; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const w = 1 + Math.random() * 2;
+    const h = 3 + Math.random() * 6;
+    const dark = Math.random() < 0.5;
+    ctx.strokeStyle = dark ? "rgba(20,40,18,0.6)" : "rgba(80,130,55,0.55)";
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + (Math.random() - 0.5) * 2, y - h);
+    ctx.stroke();
+  }
+  // A few patches of dirt showing through
+  for (let i = 0; i < 4; i++) {
+    const cx = Math.random() * size;
+    const cy = Math.random() * size;
+    const r = 6 + Math.random() * 8;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, "rgba(110,90,60,0.6)");
+    grad.addColorStop(1, "rgba(110,90,60,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // A few small flowers
+  for (let i = 0; i < 6; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    ctx.fillStyle = ["#f8e870", "#f8b070", "#e0e0e0"][Math.floor(Math.random() * 3)];
+    ctx.beginPath();
+    ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  grassColorMap = tex;
+  return tex;
+}
+
+let grassNormalMap: THREE.CanvasTexture | null = null;
+export function getGrassNormalMap(): THREE.CanvasTexture {
+  if (grassNormalMap) return grassNormalMap;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#8080ff";
+  ctx.fillRect(0, 0, size, size);
+  // Random noise for grass tufts
+  const data = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < data.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 60;
+    data.data[i] = Math.max(0, Math.min(255, 128 + n));
+    data.data[i + 1] = Math.max(0, Math.min(255, 128 + n));
+    data.data[i + 2] = 255;
+  }
+  ctx.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  tex.needsUpdate = true;
+  grassNormalMap = tex;
+  return tex;
+}
+
+let sandColorMap: THREE.CanvasTexture | null = null;
+export function getSandColorMap(): THREE.CanvasTexture {
+  if (sandColorMap) return sandColorMap;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#bda672";
+  ctx.fillRect(0, 0, size, size);
+  // Sand grains
+  for (let i = 0; i < 1500; i++) {
+    const x = Math.random() * size;
+    const y = Math.random() * size;
+    const v = 100 + Math.random() * 80;
+    ctx.fillStyle = `rgba(${v},${v - 10},${v - 30},${0.2 + Math.random() * 0.3})`;
+    ctx.fillRect(x, y, 1, 1);
+  }
+  // Wave-like ridges
+  for (let i = 0; i < 5; i++) {
+    const y = Math.random() * size;
+    ctx.strokeStyle = "rgba(140,110,70,0.15)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x < size; x += 4) {
+      const yy = y + Math.sin(x * 0.1 + i) * 2;
+      if (x === 0) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  sandColorMap = tex;
+  return tex;
+}
+
+let woodColorMap: THREE.CanvasTexture | null = null;
+export function getWoodColorMap(): THREE.CanvasTexture {
+  if (woodColorMap) return woodColorMap;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#6a4a28";
+  ctx.fillRect(0, 0, size, size);
+  // Wood grain — vertical lines
+  for (let i = 0; i < 60; i++) {
+    const x = Math.random() * size;
+    const dark = 60 + Math.random() * 40;
+    ctx.strokeStyle = `rgba(${dark - 20},${dark - 30},${dark - 40},${0.3 + Math.random() * 0.3})`;
+    ctx.lineWidth = 1 + Math.random() * 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    let cx = x;
+    for (let y = 0; y < size; y += 4) {
+      cx += (Math.random() - 0.5) * 0.4;
+      ctx.lineTo(cx, y);
+    }
+    ctx.stroke();
+  }
+  // Knot
+  for (let i = 0; i < 1; i++) {
+    const cx = Math.random() * size;
+    const cy = Math.random() * size;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 8);
+    grad.addColorStop(0, "rgba(40,25,12,0.8)");
+    grad.addColorStop(1, "rgba(40,25,12,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1);
+  tex.needsUpdate = true;
+  woodColorMap = tex;
+  return tex;
+}
+
+let waterColorMap: THREE.CanvasTexture | null = null;
+export function getWaterColorMap(): THREE.CanvasTexture {
+  if (waterColorMap) return waterColorMap;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "#1a3a5a";
+  ctx.fillRect(0, 0, size, size);
+  // Caustic-like ripples
+  for (let i = 0; i < 20; i++) {
+    const cx = Math.random() * size;
+    const cy = Math.random() * size;
+    const rx = 6 + Math.random() * 12;
+    const ry = 2 + Math.random() * 4;
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    grad.addColorStop(0, "rgba(150,200,255,0.18)");
+    grad.addColorStop(1, "rgba(150,200,255,0)");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 2);
+  tex.needsUpdate = true;
+  waterColorMap = tex;
+  return tex;
+}
+
+// ---------------------------------------------------------------------------
+//  Tile material factory — one cached material per terrain type. The
+//  same MeshStandardMaterial is reused across all tiles of the same
+//  type so we don't blow up the draw call list or allocate dozens of
+//  textures.
+// ---------------------------------------------------------------------------
+const tileMaterialCache = new Map<string, THREE.MeshStandardMaterial>();
+export function getTileMaterial(type: string): THREE.MeshStandardMaterial {
+  if (tileMaterialCache.has(type)) return tileMaterialCache.get(type)!;
+  let mat: THREE.MeshStandardMaterial;
+  switch (type) {
+    case "forest":
+    case "thicket":
+    case "deployment":
+    case "plain":
+      mat = new THREE.MeshStandardMaterial({
+        map: getGrassColorMap(),
+        normalMap: getGrassNormalMap(),
+        normalScale: new THREE.Vector2(0.5, 0.5),
+        color: type === "deployment" ? new THREE.Color(0.85, 1.0, 0.85)
+             : type === "forest" || type === "thicket" ? new THREE.Color(0.7, 0.95, 0.7)
+             : new THREE.Color(1.0, 1.0, 1.0),
+        roughness: 0.95,
+        metalness: 0.0,
+      });
+      break;
+    case "sand":
+    case "road":
+    case "bridge":
+      mat = new THREE.MeshStandardMaterial({
+        map: getSandColorMap(),
+        color: type === "bridge" ? new THREE.Color(0.85, 0.75, 0.55)
+             : type === "road" ? new THREE.Color(1.1, 1.0, 0.85)
+             : new THREE.Color(1.0, 1.0, 1.0),
+        roughness: 0.92,
+        metalness: 0.0,
+      });
+      break;
+    case "water":
+    case "deep_water":
+      mat = new THREE.MeshStandardMaterial({
+        map: getWaterColorMap(),
+        color: type === "deep_water" ? new THREE.Color(0.7, 0.85, 1.1) : new THREE.Color(1.0, 1.0, 1.0),
+        roughness: 0.15,
+        metalness: 0.4,
+        envMapIntensity: 1.0,
+      });
+      break;
+    case "mountain":
+    case "cliff":
+      mat = new THREE.MeshStandardMaterial({
+        map: getStoneColorMap(),
+        normalMap: getStoneNormalMap(),
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        color: new THREE.Color(0.95, 0.92, 0.88),
+        roughness: 0.95,
+        metalness: 0.05,
+      });
+      break;
+    case "fort":
+    case "wall":
+      mat = new THREE.MeshStandardMaterial({
+        map: getStoneColorMap(),
+        normalMap: getStoneNormalMap(),
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        color: type === "fort" ? new THREE.Color(0.95, 0.92, 0.88) : new THREE.Color(0.55, 0.55, 0.6),
+        roughness: 0.85,
+        metalness: 0.1,
+      });
+      break;
+    case "floor":
+      mat = new THREE.MeshStandardMaterial({
+        map: getWoodColorMap(),
+        color: new THREE.Color(1.0, 1.0, 1.0),
+        roughness: 0.75,
+        metalness: 0.1,
+      });
+      break;
+    case "throne":
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(1.4, 1.2, 0.5),
+        roughness: 0.4,
+        metalness: 0.3,
+        emissive: new THREE.Color(0.6, 0.4, 0.0),
+        emissiveIntensity: 0.2,
+      });
+      break;
+    default:
+      mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0.4, 0.4, 0.4),
+        roughness: 0.9,
+        metalness: 0.0,
+      });
+  }
+  tileMaterialCache.set(type, mat);
+  return mat;
+}

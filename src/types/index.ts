@@ -45,6 +45,18 @@ export interface WeaponDef {
   brave?: boolean;
 }
 
+export interface ItemDef {
+  id: string;
+  name: string;
+  desc: string;
+  type: "heal" | "cure" | "boost" | "promote" | "key";
+  healAmount?: number;
+  healPercent?: number;
+  statTarget?: string;
+  statAmount?: number;
+  uses: number;
+}
+
 export interface ClassDef {
   id: string;
   name: string;
@@ -74,6 +86,7 @@ export interface UnitDef {
   portraitColor: string;
   pos?: { x: number; y: number };
   aiType?: AIType;
+  items?: string[]; // consumable items (vulnerary, elixir, master_seal, etc)
 }
 
 export type AIType =
@@ -101,6 +114,7 @@ export interface ChapterDef {
     unitId: string;
     pos: { x: number; y: number };
     aiType?: AIType;
+    isBoss?: boolean;
   }>;
   maxTurns?: number;
 }

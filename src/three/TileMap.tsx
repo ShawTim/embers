@@ -5,23 +5,28 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { GameGrid, Pos } from "../game/grid";
 import { posKey } from "../game/grid";
 import { useGame } from "../game/store";
+import { getTileMaterial } from "./shared/SceneAssets";
 
-const TERRAIN_CFG: Record<string, { height: number; color: THREE.Color; roughness: number; metalness: number }> = {
-  plain: { height: 0.1, color: new THREE.Color(0.32, 0.52, 0.26), roughness: 0.85, metalness: 0 },
-  forest: { height: 0.12, color: new THREE.Color(0.16, 0.34, 0.14), roughness: 0.9, metalness: 0 },
-  mountain: { height: 0.5, color: new THREE.Color(0.52, 0.44, 0.35), roughness: 0.95, metalness: 0.05 },
-  fort: { height: 0.2, color: new THREE.Color(0.46, 0.46, 0.50), roughness: 0.7, metalness: 0.1 },
-  road: { height: 0.08, color: new THREE.Color(0.64, 0.58, 0.44), roughness: 0.8, metalness: 0 },
-  water: { height: 0.04, color: new THREE.Color(0.10, 0.32, 0.56), roughness: 0.12, metalness: 0.6 },
-  deep_water: { height: 0.02, color: new THREE.Color(0.06, 0.16, 0.38), roughness: 0.08, metalness: 0.7 },
-  cliff: { height: 1.2, color: new THREE.Color(0.40, 0.34, 0.28), roughness: 0.95, metalness: 0 },
-  sand: { height: 0.1, color: new THREE.Color(0.80, 0.74, 0.50), roughness: 0.9, metalness: 0 },
-  thicket: { height: 0.15, color: new THREE.Color(0.10, 0.26, 0.10), roughness: 0.9, metalness: 0 },
-  floor: { height: 0.1, color: new THREE.Color(0.44, 0.39, 0.35), roughness: 0.7, metalness: 0.05 },
-  wall: { height: 1.0, color: new THREE.Color(0.26, 0.26, 0.30), roughness: 0.8, metalness: 0.1 },
-  throne: { height: 0.2, color: new THREE.Color(0.56, 0.46, 0.14), roughness: 0.4, metalness: 0.3 },
-  deployment: { height: 0.1, color: new THREE.Color(0.20, 0.50, 0.20), roughness: 0.8, metalness: 0 },
-  bridge: { height: 0.1, color: new THREE.Color(0.52, 0.40, 0.24), roughness: 0.85, metalness: 0 },
+// Tile geometry / height per type. The visual material comes from
+// the cached procedural material in SceneAssets (grass, sand, wood,
+// stone, water) so every tile of the same type shares one texture
+// atlas. This keeps draw calls down and the textures crisp.
+const TERRAIN_CFG: Record<string, { height: number; roughness: number; metalness: number }> = {
+  plain: { height: 0.1, roughness: 0.95, metalness: 0 },
+  forest: { height: 0.12, roughness: 0.95, metalness: 0 },
+  mountain: { height: 0.5, roughness: 0.95, metalness: 0.05 },
+  fort: { height: 0.2, roughness: 0.75, metalness: 0.1 },
+  road: { height: 0.08, roughness: 0.92, metalness: 0 },
+  water: { height: 0.04, roughness: 0.15, metalness: 0.4 },
+  deep_water: { height: 0.02, roughness: 0.1, metalness: 0.4 },
+  cliff: { height: 1.2, roughness: 0.95, metalness: 0 },
+  sand: { height: 0.1, roughness: 0.92, metalness: 0 },
+  thicket: { height: 0.15, roughness: 0.95, metalness: 0 },
+  floor: { height: 0.1, roughness: 0.75, metalness: 0.1 },
+  wall: { height: 1.0, roughness: 0.85, metalness: 0.15 },
+  throne: { height: 0.2, roughness: 0.4, metalness: 0.3 },
+  deployment: { height: 0.1, roughness: 0.95, metalness: 0 },
+  bridge: { height: 0.1, roughness: 0.85, metalness: 0 },
 };
 
 const DECOR_MODELS: Record<string, string[]> = {
@@ -64,7 +69,10 @@ function Tile({ grid, tile }: { grid: GameGrid; tile: { pos: Pos; type: string }
   const onDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); onTileClick(tile.pos); };
   return (
     <group position={[tile.pos.x, 0, tile.pos.y]}>
-      <mesh position={[0, height / 2, 0]} onPointerEnter={onEnter} onPointerDown={onDown} castShadow={!isWall} receiveShadow><boxGeometry args={[0.95, height, 0.95]} /><meshStandardMaterial color={cfg.color} roughness={cfg.roughness} metalness={cfg.metalness} /></mesh>
+      <mesh position={[0, height / 2, 0]} onPointerEnter={onEnter} onPointerDown={onDown} castShadow={!isWall} receiveShadow>
+        <boxGeometry args={[0.95, height, 0.95]} />
+        <primitive object={getTileMaterial(tile.type)} attach="material" />
+      </mesh>
       <Suspense fallback={null}><TileDecorations type={tile.type} height={height} pos={tile.pos} /></Suspense>
       {oc && <mesh position={[0, height + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color={oc} transparent opacity={oo + (isHovered ? 0.15 : 0)} side={THREE.DoubleSide} /></mesh>}
       {isHovered && !oc && <mesh position={[0, height + 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color="white" transparent opacity={0.12} side={THREE.DoubleSide} /></mesh>}

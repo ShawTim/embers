@@ -1,6 +1,6 @@
 import type {
   TerrainDef, TerrainType, ClassDef, WeaponDef, MoveType,
-  UnitDef, ChapterDef,
+  UnitDef, ChapterDef, ItemDef,
 } from "../types";
 
 export const TERRAIN: Record<TerrainType, TerrainDef> = {
@@ -45,6 +45,16 @@ export const WEAPONS: Record<string, WeaponDef> = {
   heal_staff:  { id: "heal_staff",  name: "Heal",        desc: "Restores HP to adjacent ally.",    type: "staff", triangle: "none",  rank: 1, might: 8,  hit: 100,weight: 2, crit: 0, minRange: 1, maxRange: 1, uses: 45 },
 };
 
+export const ITEMS: Record<string, ItemDef> = {
+  vulnerary: { id: "vulnerary", name: "Vulnerary", desc: "Restores 10 HP.", type: "heal", healAmount: 10, uses: 3 },
+  elixir: { id: "elixir", name: "Elixir", desc: "Fully restores HP.", type: "heal", healPercent: 100, uses: 1 },
+  master_seal: { id: "master_seal", name: "Master Seal", desc: "Promotes a Lv10+ unit.", type: "promote", uses: 1 },
+  str_ring: { id: "str_ring", name: "Strength Ring", desc: "+2 STR permanently.", type: "boost", statTarget: "str", statAmount: 2, uses: 1 },
+  spd_ring: { id: "spd_ring", name: "Speed Ring", desc: "+2 SPD permanently.", type: "boost", statTarget: "spd", statAmount: 2, uses: 1 },
+  def_ring: { id: "def_ring", name: "Defense Ring", desc: "+2 DEF permanently.", type: "boost", statTarget: "def", statAmount: 2, uses: 1 },
+};
+
+
 export const CLASSES: Record<string, ClassDef> = {
   lord: { id: "lord", name: "Lord", desc: "Balanced leader.", tier: 1, moveType: "infantry", baseMove: 5, base: { hp: 22, str: 7, mag: 2, skl: 7, spd: 7, lck: 7, def: 6, res: 3 }, growth: { hp: 70, str: 40, mag: 10, skl: 40, spd: 35, lck: 40, def: 35, res: 20 }, caps: { hp: 60, str: 25, mag: 15, skl: 30, spd: 28, lck: 30, def: 28, res: 22 }, weapons: ["sword"] },
   knight: { id: "knight", name: "Knight", desc: "Heavy armor.", tier: 1, moveType: "armored", baseMove: 4, base: { hp: 28, str: 8, mag: 0, skl: 5, spd: 3, lck: 3, def: 12, res: 1 }, growth: { hp: 85, str: 40, mag: 5, skl: 30, spd: 20, lck: 25, def: 55, res: 10 }, caps: { hp: 70, str: 28, mag: 10, skl: 28, spd: 20, lck: 30, def: 35, res: 20 }, weapons: ["lance"] },
@@ -54,10 +64,25 @@ export const CLASSES: Record<string, ClassDef> = {
   mercenary: { id: "mercenary", name: "Mercenary", desc: "Sword for hire.", tier: 1, moveType: "infantry", baseMove: 6, base: { hp: 22, str: 7, mag: 0, skl: 9, spd: 9, lck: 4, def: 5, res: 2 }, growth: { hp: 70, str: 35, mag: 5, skl: 45, spd: 40, lck: 30, def: 30, res: 18 }, caps: { hp: 60, str: 25, mag: 12, skl: 34, spd: 34, lck: 30, def: 26, res: 22 }, weapons: ["sword"] },
   fighter: { id: "fighter", name: "Fighter", desc: "Axe bruiser.", tier: 1, moveType: "infantry", baseMove: 5, base: { hp: 26, str: 8, mag: 0, skl: 4, spd: 6, lck: 2, def: 4, res: 1 }, growth: { hp: 80, str: 50, mag: 5, skl: 25, spd: 30, lck: 20, def: 25, res: 12 }, caps: { hp: 70, str: 30, mag: 10, skl: 24, spd: 28, lck: 25, def: 25, res: 18 }, weapons: ["axe"] },
   cavalier: { id: "cavalier", name: "Cavalier", desc: "Mounted.", tier: 1, moveType: "cavalry", baseMove: 7, base: { hp: 24, str: 7, mag: 0, skl: 7, spd: 7, lck: 4, def: 7, res: 3 }, growth: { hp: 70, str: 40, mag: 5, skl: 35, spd: 35, lck: 30, def: 35, res: 25 }, caps: { hp: 65, str: 26, mag: 15, skl: 30, spd: 30, lck: 30, def: 30, res: 28 }, weapons: ["sword", "lance"] },
+  // === Tier 2 (Promoted) ===
+  lord_knight: { id: "lord_knight", name: "Lord Knight", desc: "Promoted Lord. Master swordsman.", tier: 2, moveType: "infantry", baseMove: 6, base: { hp: 30, str: 10, mag: 3, skl: 10, spd: 10, lck: 8, def: 9, res: 5 }, growth: { hp: 75, str: 45, mag: 15, skl: 45, spd: 40, lck: 45, def: 40, res: 25 }, caps: { hp: 70, str: 28, mag: 18, skl: 34, spd: 32, lck: 35, def: 32, res: 28 }, weapons: ["sword"] },
+  general: { id: "general", name: "General", desc: "Promoted Knight. Impenetrable fortress.", tier: 2, moveType: "armored", baseMove: 5, base: { hp: 36, str: 11, mag: 0, skl: 7, spd: 4, lck: 4, def: 16, res: 2 }, growth: { hp: 95, str: 45, mag: 5, skl: 35, spd: 22, lck: 28, def: 60, res: 12 }, caps: { hp: 80, str: 30, mag: 10, skl: 30, spd: 22, def: 40, res: 22, lck: 30 }, weapons: ["lance", "axe"] },
+  sniper: { id: "sniper", name: "Sniper", desc: "Promoted Archer. Deadly precision.", tier: 2, moveType: "infantry", baseMove: 6, base: { hp: 26, str: 8, mag: 0, skl: 11, spd: 8, lck: 5, def: 5, res: 3 }, growth: { hp: 65, str: 45, mag: 5, skl: 55, spd: 40, lck: 35, def: 28, res: 22 }, caps: { hp: 60, str: 28, mag: 10, skl: 40, spd: 33, lck: 35, def: 26, res: 25 }, weapons: ["bow"] },
+  sage: { id: "sage", name: "Sage", desc: "Promoted Mage. Master of anima magic.", tier: 2, moveType: "infantry", baseMove: 6, base: { hp: 24, str: 2, mag: 10, skl: 8, spd: 9, lck: 4, def: 3, res: 7 }, growth: { hp: 55, str: 12, mag: 60, skl: 38, spd: 38, lck: 32, def: 18, res: 45 }, caps: { hp: 55, str: 16, mag: 32, skl: 30, spd: 32, lck: 32, def: 20, res: 35 }, weapons: ["fire", "staff"] },
+  bishop: { id: "bishop", name: "Bishop", desc: "Promoted Cleric. Holy healer.", tier: 2, moveType: "infantry", baseMove: 6, base: { hp: 24, str: 2, mag: 8, skl: 6, spd: 8, lck: 8, def: 3, res: 10 }, growth: { hp: 55, str: 6, mag: 45, skl: 32, spd: 38, lck: 45, def: 18, res: 55 }, caps: { hp: 55, str: 14, mag: 30, skl: 30, spd: 30, lck: 40, def: 20, res: 38 }, weapons: ["staff", "light"] },
+  hero: { id: "hero", name: "Hero", desc: "Promoted Mercenary. Legendary warrior.", tier: 2, moveType: "infantry", baseMove: 7, base: { hp: 28, str: 9, mag: 0, skl: 12, spd: 12, lck: 5, def: 7, res: 3 }, growth: { hp: 75, str: 40, mag: 5, skl: 50, spd: 45, lck: 32, def: 35, res: 20 }, caps: { hp: 65, str: 27, mag: 12, skl: 38, spd: 38, lck: 32, def: 30, res: 25 }, weapons: ["sword", "axe"] },
+  warrior: { id: "warrior", name: "Warrior", desc: "Promoted Fighter. Unstoppable brute.", tier: 2, moveType: "infantry", baseMove: 6, base: { hp: 32, str: 11, mag: 0, skl: 6, spd: 8, lck: 3, def: 6, res: 2 }, growth: { hp: 90, str: 55, mag: 5, skl: 28, spd: 35, lck: 22, def: 30, res: 14 }, caps: { hp: 80, str: 33, mag: 10, skl: 28, spd: 32, lck: 28, def: 30, res: 20 }, weapons: ["axe", "bow"] },
+  paladin: { id: "paladin", name: "Paladin", desc: "Promoted Cavalier. Holy knight.", tier: 2, moveType: "cavalry", baseMove: 8, base: { hp: 30, str: 9, mag: 0, skl: 9, spd: 9, lck: 5, def: 9, res: 5 }, growth: { hp: 80, str: 45, mag: 5, skl: 40, spd: 38, lck: 32, def: 40, res: 30 }, caps: { hp: 70, str: 28, mag: 15, skl: 34, spd: 34, lck: 32, def: 35, res: 32 }, weapons: ["sword", "lance"] },
+};
+
+// Promotion map: tier1 → tier2
+export const PROMOTIONS: Record<string, string> = {
+  lord: "lord_knight", knight: "general", archer: "sniper", mage: "sage",
+  cleric: "bishop", mercenary: "hero", fighter: "warrior", cavalier: "paladin",
 };
 
 export const UNITS: Record<string, UnitDef> = {
-  kael: { id: "kael", name: "Kael", desc: "Young lord of House Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "Paladin", portraitColor: "#3a6ad8" },
+  kael: { id: "kael", name: "Kael", desc: "Young lord of House Ashwood.", classId: "lord", level: 1, faction: "player", isLord: true, growthBonus: { hp: 15, str: 10, skl: 10, spd: 10, lck: 10, def: 10, res: 10 }, inventory: ["iron_sword"], modelId: "Ranger", portraitColor: "#3a6ad8" },
   lyra: { id: "lyra", name: "Lyra", desc: "Devoted healer.", classId: "cleric", level: 1, faction: "player", growthBonus: { mag: 15, res: 15 }, inventory: ["heal_staff"], modelId: "Witch", portraitColor: "#d8c850" },
   borin: { id: "borin", name: "Borin", desc: "Veteran knight.", classId: "knight", level: 3, faction: "player", growthBonus: { hp: 15, str: 10, def: 15 }, inventory: ["iron_lance"], modelId: "BlackKnight", portraitColor: "#686872" },
   serra: { id: "serra", name: "Serra", desc: "Sharp-eyed hunter.", classId: "archer", level: 2, faction: "player", growthBonus: { skl: 15, spd: 10 }, inventory: ["iron_bow"], modelId: "MagicalGirl", portraitColor: "#3a8a3a" },
@@ -249,7 +274,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: "ch14", name: "The Frozen Lake", desc: "Cross the ice without falling", objective: "Reach the far shore",
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
-    terrain: {} // All default (water would be here, but simplified)
+    terrain: {}, // All default (water would be here, but simplified)
     deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:2,y:5}],
     enemies: [
       {unitId:"cultist",pos:{x:7,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:7},aiType:"aggressive"},

@@ -84,6 +84,8 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
 .big-message { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%); z-index: 300; pointer-events: none; font-size: 48px; font-weight: 800; text-shadow: 0 0 20px #000, 0 4px 8px #000; text-align: center; animation: messageIn 0.5s ease-out; }
 @keyframes messageIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
 .start-screen { position: absolute; inset: 0; z-index: 500; pointer-events: none; animation: startFadeIn 0.6s ease-out; }
+.lang-toggle-wrap { position: absolute; top: 20px; right: 20px; z-index: 600; pointer-events: auto; }
+.lang-toggle-wrap .lang-toggle { width: 44px; height: 44px; font-size: 15px; }
 .start-screen .start-card { position: absolute; left: 24px; bottom: 280px; display: flex; flex-direction: column; align-items: flex-start; padding: 14px 20px 18px; background: linear-gradient(180deg, rgba(10,14,22,0.62) 0%, rgba(6,10,18,0.78) 100%); border: 1px solid rgba(100,140,200,0.2); border-radius: 12px; backdrop-filter: blur(10px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); pointer-events: auto; max-width: 320px; }
 .start-screen .start-card h1 { font-size: 30px; margin-bottom: 2px; }
 .start-screen .start-card .subtitle { margin-bottom: 8px; font-size: 10px; }

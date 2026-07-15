@@ -2,7 +2,7 @@ export interface DialogueLine {
   speaker: string;      // unit def.id, or "narrator"
   speakerName?: { en: string; zh: string };
   text: { en: string; zh: string };
-  mood?: "neutral" | "angry" | "sad" | "determined" | "surprised" | "happy";
+  mood?: "neutral" | "angry" | "sad" | "determined" | "surprised" | "happy" | "worried" | "desperate" | "urgent" | "terrified";
 }
 
 export interface DialogueScript {

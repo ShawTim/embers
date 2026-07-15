@@ -4,6 +4,7 @@ import { Scene } from "./three/Scene";
 import { LandingScene } from "./three/LandingScene";
 import { HUD } from "./ui/HUD";
 import { DialogueBox } from "./ui/DialogueBox";
+import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
 
 export default function App() {
@@ -18,6 +19,9 @@ export default function App() {
     <>
       <LandingScene />
       <div className="start-screen">
+        <div className="lang-toggle-wrap">
+          <LangToggle />
+        </div>
         <div className="start-card">
           <h1>{tt("gameTitle")}</h1>
           <div className="subtitle">{tt("subtitle")}</div>

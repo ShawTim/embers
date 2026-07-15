@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { RuntimeUnit } from "../types";
 import { GameGrid, type Pos, posKey } from "./grid";
-import { createUnit } from "../data/unitFactory";
+import { createUnit, useItemOnUnit } from "../data/unitFactory";
 import { resolveCombat, calculateExp, type CombatPreview, previewCombat } from "./combat";
 import { decideAIAction, type AIDecision } from "./ai";
 import { CHAPTERS } from "../data/gameData";
@@ -62,6 +62,10 @@ interface GameState {
   activeDialogue: string | null;
   setDialogue: (id: string | null) => void;
   clearDialogue: () => void;
+  useItemAction: (itemId: string) => void;
+  equipWeaponAction: (weaponIndex: number) => void;
+  convoy: { id: string; type: "weapon" | "item"; uses: number }[];
+  addToConvoy: (id: string, type: "weapon" | "item", uses?: number) => void;
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -74,6 +78,13 @@ export const useGame = create<GameState>((set, get) => ({
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
   hitEffects: [], damageNumbers: [], screenShake: 0, activeCombat: null, combatPhase: null,
   activeDialogue: null,
+  convoy: [
+    { id: "vulnerary", type: "item", uses: 3 },
+    { id: "vulnerary", type: "item", uses: 3 },
+    { id: "iron_sword", type: "weapon", uses: 45 },
+    { id: "iron_lance", type: "weapon", uses: 45 },
+    { id: "master_seal", type: "item", uses: 1 },
+  ],
 
   setLang: (lang) => { if (typeof localStorage !== "undefined") localStorage.setItem("srpg-lang", lang); set({ lang }); },
 
@@ -83,7 +94,7 @@ export const useGame = create<GameState>((set, get) => ({
     for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
     const units: RuntimeUnit[] = [];
     const playerIdsByChapter: Record<string, string[]> = {
-      ch01: ["kael", "lyra", "borin"],
+      ch01: ["kael", "lyra", "borin", "serra"],
       ch02: ["kael", "lyra", "borin", "serra"],
       ch03: ["kael", "lyra", "borin", "serra", "maren"],
       ch04: ["kael", "lyra", "borin", "serra", "maren"],
@@ -274,6 +285,34 @@ export const useGame = create<GameState>((set, get) => ({
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),
   clearDialogue: () => set({ activeDialogue: null }),
+  useItemAction: (itemId) => {
+    const st = get(); if (!st.selectedUnit) return;
+    const unit = st.selectedUnit;
+    const result = useItemOnUnit(itemId, unit);
+    if (result.success) {
+      // Remove item from convoy
+      const idx = st.convoy.findIndex(c => c.id === itemId);
+      if (idx >= 0) {
+        const newConvoy = [...st.convoy];
+        newConvoy[idx] = { ...newConvoy[idx], uses: newConvoy[idx].uses - 1 };
+        if (newConvoy[idx].uses <= 0) newConvoy.splice(idx, 1);
+        get().addLog(`${unitName(unit.def.id, st.lang)} used ${itemId}: ${result.message}`, "#3aff3a");
+        set({ convoy: newConvoy, units: [...st.grid!.getAllUnits()] });
+      }
+      unit.hasActed = true;
+      set({ selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", units: [...st.grid!.getAllUnits()] });
+    }
+  },
+  equipWeaponAction: (weaponIndex) => {
+    const st = get(); if (!st.selectedUnit) return;
+    const unit = st.selectedUnit;
+    if (weaponIndex >= 0 && weaponIndex < unit.weapons.length) {
+      unit.equippedWeapon = unit.weapons[weaponIndex];
+      get().addLog(`${unitName(unit.def.id, st.lang)} equipped ${unit.equippedWeapon.name}`, "#8cf");
+      set({ units: [...st.grid!.getAllUnits()] });
+    }
+  },
+  addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
 }));
 
 function checkBattleEnd(set: any, get: any) {
