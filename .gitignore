@@ -3,3 +3,8 @@ dist/
 .DS_Store
 *.log
 .vite/
+
+# Throwaway playwright E2E debug scripts (kept on disk, not in git)
+e2e_*.mjs
+smoke_*.mjs
+/tmp/
