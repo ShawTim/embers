@@ -58,7 +58,7 @@ function Tile({ grid, tile }: { grid: GameGrid; tile: { pos: Pos; type: string }
   const key = posKey(tile.pos);
   const inMoveRange = moveRange.has(key);
   const inAttackRange = attackRange.includes(key);
-  const isHovered = hoveredTile && hoveredTile.x === tile.pos.x && hoveredTile.y === tile.pos.y;
+  const isHovered = !!(hoveredTile && hoveredTile.x === tile.pos.x && hoveredTile.y === tile.pos.y);
   const cfg = TERRAIN_CFG[tile.type] || TERRAIN_CFG.plain;
   const isWall = tile.type === "wall" || tile.type === "cliff";
   const height = cfg.height;
