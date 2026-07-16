@@ -22,9 +22,10 @@ export function getAttackSpeed(u: RuntimeUnit): number {
 
 export function getAttackPower(u: RuntimeUnit): number {
   const w = u.equippedWeapon;
-  const might = w ? w.might : 0;
-  const isMag = w ? ["fire","thunder","wind","light","dark"].includes(w.type) : false;
-  return Math.max(0, (isMag ? u.stats.mag : u.stats.str) + might);
+  if (!w) return 0;
+  if (w.type === "staff") return 0;
+  const isMag = ["fire","thunder","wind","light","dark"].includes(w.type);
+  return Math.max(0, (isMag ? u.stats.mag : u.stats.str) + w.might);
 }
 
 export function getHitRate(u: RuntimeUnit): number {

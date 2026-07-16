@@ -126,7 +126,7 @@ export const UNITS: Record<string, UnitDef> = {
   serra: { id: "serra", name: "Serra", desc: "Sharp-eyed hunter from the north.", classId: "archer", level: 2, faction: "player", growthBonus: { skl: 15, spd: 10 }, inventory: ["iron_bow"], modelId: "Ranger", portraitColor: "#3a8a3a" },
   bandit_sword: { id: "bandit_sword", name: "Bandit", desc: "Common brigand.", classId: "mercenary", level: 1, faction: "enemy", inventory: ["iron_sword"], modelId: "Skeleton_Warrior", portraitColor: "#8a4a2a" },
   bandit_axe: { id: "bandit_axe", name: "Brigand", desc: "Thug with an axe.", classId: "fighter", level: 2, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Warrior", portraitColor: "#6a3a1a" },
-  boss_garrick: { id: "boss_garrick", name: "Garrick the Cruel", desc: "Leader of the Ashwood Bandits.", classId: "fighter", level: 5, faction: "enemy", isBoss: true, growthBonus: { hp: 20, str: 15, def: 10 }, inventory: ["steel_sword"], modelId: "Skeleton_Warrior", portraitColor: "#9a1a1a" },
+  boss_garrick: { id: "boss_garrick", name: "Garrick the Cruel", desc: "Leader of the Ashwood Bandits.", classId: "fighter", level: 3, faction: "enemy", isBoss: true, growthBonus: { hp: 20, str: 15, def: 10 }, inventory: ["steel_sword"], modelId: "Skeleton_Warrior", portraitColor: "#9a1a1a" },
   umbral_mage: { id: "umbral_mage", name: "Umbral Acolyte", desc: "Cultist with fire magic.", classId: "mage", level: 3, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#5a1a6a" },
   // New recruits
   maren: { id: "maren", name: "Maren", desc: "Arcane scholar.", classId: "mage", level: 4, faction: "player", growthBonus: { mag: 20, spd: 10 }, inventory: ["fire"], modelId: "Druid", portraitColor: "#6a2ada" },
@@ -150,7 +150,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch01", name: "Prologue", desc: "Defeat Garrick", objective: "Defeat Garrick",
     objectiveType: "boss", mapSize: { w: 16, h: 12 },
     terrain: { "5,2":"forest","5,3":"forest","6,2":"forest","6,3":"forest","11,8":"forest","11,9":"forest","12,8":"forest","12,9":"forest","3,9":"fort","4,9":"fort","2,3":"wall","3,3":"wall","4,3":"wall","0,5":"wall","0,6":"wall","0,7":"wall","0,8":"wall","14,0":"wall","14,1":"wall","14,10":"wall","14,11":"wall" },
-    deploymentPoints: [{x:2,y:6},{x:2,y:7},{x:2,y:8},{x:3,y:7}],
+    deploymentPoints: [{x:1,y:6},{x:1,y:8},{x:2,y:7},{x:3,y:7}],
     enemies: [
       { unitId:"bandit_axe",pos:{x:8,y:3},aiType:"aggressive" },{ unitId:"bandit_axe",pos:{x:10,y:5},aiType:"aggressive" },
       { unitId:"bandit_sword",pos:{x:9,y:8},aiType:"aggressive" },{ unitId:"bandit_sword",pos:{x:12,y:7},aiType:"aggressive" },
@@ -167,8 +167,8 @@ export const CHAPTERS: ChapterDef[] = [
       {unitId:"bandit_axe",pos:{x:8,y:4},aiType:"aggressive"},{unitId:"bandit_sword",pos:{x:8,y:10},aiType:"aggressive"},
       {unitId:"bandit_axe",pos:{x:10,y:7},aiType:"defensive"},{unitId:"umbral_mage",pos:{x:12,y:5},aiType:"sniper"},
       {unitId:"umbral_mage",pos:{x:13,y:9},aiType:"sniper"},{unitId:"bandit_sword",pos:{x:14,y:6},aiType:"aggressive"},
-      {unitId:"bandit_axe",pos:{x:15,y:8},aiType:"aggressive"},{unitId:"bandit_sword",pos:{x:16,y:3},aiType:"stationary"},
-      {unitId:"boss_garrick",pos:{x:18,y:7},aiType:"boss",isBoss:true},
+      {unitId:"bandit_axe",pos:{x:15,y:8},aiType:"aggressive"},      {unitId:"bandit_sword",pos:{x:16,y:3},aiType:"stationary"},
+      {unitId:"cult_captain",pos:{x:18,y:7},aiType:"boss",isBoss:true},
     ],
     reinforcements: [{turn:3,unitId:"bandit_sword",pos:{x:19,y:0},aiType:"aggressive"},{turn:5,unitId:"umbral_mage",pos:{x:10,y:14},aiType:"aggressive"}],
   },

@@ -224,7 +224,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   useEffect(() => { if (unit.isDead && !dead) { playAnim(ANIM.deathA, false, 0.2); const tm = setTimeout(() => setDead(true), 2000); return () => clearTimeout(tm); } }, [unit.isDead]);
 
   const onPointerEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; hoverUnit(unit); if (selectionMode === "targeting" && unit.faction !== "player") { const sel = useGame.getState().selectedUnit; if (sel) showCombatPreview(sel, unit); } };
-  const onPointerLeave = () => { setHovered(false); document.body.style.cursor = "default"; };
+  const onPointerLeave = () => { setHovered(false); document.body.style.cursor = "default"; const cur = useGame.getState().hoveredUnit; if (cur === unit) hoverUnit(null); };
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); if (phase !== "player") return; if (selectionMode === "targeting" && unit.faction !== "player") onTileClick(unit.pos); else if (unit.faction === "player" && !unit.hasActed) selectUnit(unit); else hoverUnit(unit); };
 
   useFrame((state, delta) => {

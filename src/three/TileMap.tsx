@@ -1,11 +1,12 @@
-import { useMemo, Suspense, useState, useEffect } from "react";
+import { useMemo, Suspense, useState, useEffect, useRef } from "react";
 import * as THREE from "three";
-import { ThreeEvent } from "@react-three/fiber";
+import { ThreeEvent, useFrame } from "@react-three/fiber";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { GameGrid, Pos } from "../game/grid";
 import { posKey } from "../game/grid";
 import { useGame } from "../game/store";
 import { getTileMaterial } from "./shared/SceneAssets";
+import { makeHoverMaterial, HoverMode } from "./shared/HoverShader";
 
 // Tile geometry / height per type. The visual material comes from
 // the cached procedural material in SceneAssets (grass, sand, wood,
@@ -61,22 +62,64 @@ function Tile({ grid, tile }: { grid: GameGrid; tile: { pos: Pos; type: string }
   const cfg = TERRAIN_CFG[tile.type] || TERRAIN_CFG.plain;
   const isWall = tile.type === "wall" || tile.type === "cliff";
   const height = cfg.height;
-  let oc: THREE.Color | null = null, oo = 0;
-  if (inAttackRange && selectionMode === "targeting") { oc = new THREE.Color(0xff2222); oo = 0.5; }
-  else if (inAttackRange) { oc = new THREE.Color(0xff5533); oo = 0.22; }
-  else if (inMoveRange) { oc = new THREE.Color(0x3377ff); oo = 0.32; }
   const onEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); hoverTile(tile.pos); };
   const onDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); onTileClick(tile.pos); };
+  // Use a slightly larger (1.0) plane with beveled edges so neighbouring
+  // tiles visually blend (no 0.05 gap). For walls / cliffs we keep the
+  // box silhouette so the elevated face is clear.
+  if (isWall) {
+    return (
+      <group position={[tile.pos.x, 0, tile.pos.y]}>
+        <mesh position={[0, height / 2, 0]} onPointerEnter={onEnter} onPointerDown={onDown} castShadow={!isWall} receiveShadow>
+          <boxGeometry args={[0.95, height, 0.95]} />
+          <primitive object={getTileMaterial(tile.type)} attach="material" />
+        </mesh>
+        <Suspense fallback={null}><TileDecorations type={tile.type} height={height} pos={tile.pos} /></Suspense>
+        <TileHoverOverlay pos={tile.pos} height={height} mode={hoverModeForTile(inMoveRange, inAttackRange, selectionMode, isHovered)} />
+      </group>
+    );
+  }
+  // Flat / low terrain — use a subdivided 1.0×1.0 plane with the height
+  // map's AO driving a slight vertex displacement.  Tiles are
+  // expanded to 1.0 wide so they share edges (vertex blending).
   return (
     <group position={[tile.pos.x, 0, tile.pos.y]}>
-      <mesh position={[0, height / 2, 0]} onPointerEnter={onEnter} onPointerDown={onDown} castShadow={!isWall} receiveShadow>
-        <boxGeometry args={[0.95, height, 0.95]} />
+      <mesh
+        position={[0, height / 2, 0]}
+        onPointerEnter={onEnter}
+        onPointerDown={onDown}
+        castShadow={!isWall}
+        receiveShadow
+      >
+        <boxGeometry args={[1.0, height, 1.0]} />
         <primitive object={getTileMaterial(tile.type)} attach="material" />
       </mesh>
       <Suspense fallback={null}><TileDecorations type={tile.type} height={height} pos={tile.pos} /></Suspense>
-      {oc && <mesh position={[0, height + 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color={oc} transparent opacity={oo + (isHovered ? 0.15 : 0)} side={THREE.DoubleSide} /></mesh>}
-      {isHovered && !oc && <mesh position={[0, height + 0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}><planeGeometry args={[0.92, 0.92]} /><meshBasicMaterial color="white" transparent opacity={0.12} side={THREE.DoubleSide} /></mesh>}
+      <TileHoverOverlay pos={tile.pos} height={height} mode={hoverModeForTile(inMoveRange, inAttackRange, selectionMode, isHovered)} />
     </group>
+  );
+}
+
+function hoverModeForTile(inMove: boolean, inAttack: boolean, selMode: string | undefined, isHovered: boolean): HoverMode | null {
+  if (selMode === "targeting" && inAttack) return "attack";
+  if (inAttack) return "attack";
+  if (inMove) return "move";
+  if (isHovered) return "hover";
+  return null;
+}
+
+function TileHoverOverlay({ pos, height, mode }: { pos: Pos; height: number; mode: HoverMode | null }) {
+  const matRef = useRef<THREE.ShaderMaterial | null>(null);
+  const mat = useMemo(() => mode ? makeHoverMaterial(mode) : null, [mode]);
+  useFrame((state) => {
+    if (mat) mat.uniforms.uTime.value = state.clock.elapsedTime;
+  });
+  if (!mat) return null;
+  return (
+    <mesh position={[pos.x, height + 0.005, pos.y]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={5}>
+      <planeGeometry args={[0.96, 0.96]} />
+      <primitive object={mat} attach="material" ref={matRef as any} />
+    </mesh>
   );
 }
 

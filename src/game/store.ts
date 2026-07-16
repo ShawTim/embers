@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { RuntimeUnit } from "../types";
 import { GameGrid, type Pos, posKey } from "./grid";
-import { createUnit, useItemOnUnit } from "../data/unitFactory";
+import { createUnit, useItemOnUnit, maybeLevelUp } from "../data/unitFactory";
 import { resolveCombat, calculateExp, type CombatPreview, previewCombat } from "./combat";
 import { decideAIAction, type AIDecision } from "./ai";
 import { CHAPTERS } from "../data/gameData";
@@ -192,7 +192,11 @@ export const useGame = create<GameState>((set, get) => ({
     setP("exit", "", ""); await sleep(300);
     if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); }
     if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); }
-    if (!atk.isDead) atk.exp += calculateExp(atk, target, target.isDead);
+    if (!atk.isDead) {
+      atk.exp += calculateExp(atk, target, target.isDead);
+      const { leveledUp, newLevel } = maybeLevelUp(atk);
+      if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(atk.def.id, get().lang), n: newLevel }), "#ffe070");
+    }
     atk.hasActed = true;
     set({ phase: "player", selectedUnit: null, pendingMove: null, units: [...g.getAllUnits()], activeCombat: null, combatPhase: null });
     checkBattleEnd(set, get);
@@ -209,7 +213,10 @@ export const useGame = create<GameState>((set, get) => ({
     const healer = st.selectedUnit; st.grid.moveUnit(healer, st.pendingMove);
     const healAmt = (healer.equippedWeapon?.might || 10) + healer.stats.mag;
     const actual = Math.min(healAmt, target.maxHp - target.hp);
-    target.hp += actual; healer.exp += 20; healer.hasActed = true;
+    target.hp += actual; healer.exp += 20;
+    const { leveledUp, newLevel } = maybeLevelUp(healer);
+    if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(healer.def.id, get().lang), n: newLevel }), "#ffe070");
+    healer.hasActed = true;
     get().addLog(t("logHeal", get().lang, { healer: unitName(healer.def.id, get().lang), target: unitName(target.def.id, get().lang), n: actual }), "#3aff3a");
     get().addDamageNumber([target.pos.x, 1.5, target.pos.y], actual, { isHeal: true });
     set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()] });
@@ -255,10 +262,12 @@ export const useGame = create<GameState>((set, get) => ({
         setP("exit", "", ""); await sleep(300);
         if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); }
         if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); }
+        if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u); }
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
         const healAmt = u.equippedWeapon?.might || 10; const actual = Math.min(healAmt, dec.healTarget.maxHp - dec.healTarget.hp);
         dec.healTarget.hp += actual;
+        u.exp += 20; maybeLevelUp(u);
         get().addLog(t("logHeal", get().lang, { healer: unitName(u.def.id, get().lang), target: unitName(dec.healTarget.def.id, get().lang), n: actual }), "#3aff8a");
         get().addDamageNumber([dec.healTarget.pos.x, 1.5, dec.healTarget.pos.y], actual, { isHeal: true });
         set({ units: [...g.getAllUnits()] }); await sleep(300);

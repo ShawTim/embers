@@ -1,7 +1,7 @@
 export type Lang = "en" | "zh";
 
 const STRINGS = {
-  gameTitle: { en: "Embers of Aetheria", zh: "艾特利亞之火" },
+  gameTitle: { en: "Embers", zh: "餘燼" },
   subtitle: { en: "A Tactical SRPG", zh: "戰術角色扮演" },
   controls: { en: "Controls", zh: "操作方式" },
   leftClick: { en: "Click / Tap — Select unit or tile", zh: "點擊 — 選擇單位或地塊" },
@@ -84,6 +84,7 @@ const STRINGS = {
   logDmg: { en: "{atk} → {def}: {n} dmg{crit}{ko}", zh: "{atk} → {def}：{n} 傷害{crit}{ko}" },
   logMiss: { en: "{atk} → {def}: Miss!", zh: "{atk} → {def}：未命中！" },
   logHeal: { en: "{healer} heals {target}: +{n} HP", zh: "{healer} 治療 {target}：+{n} 點生命" },
+  logLevelUp: { en: "{name} reached Lv {n}!", zh: "{name} 升到 Lv {n}！" },
   logDefeated: { en: "{name} was defeated!", zh: "{name} 被擊敗！" },
   logReinforce: { en: "Reinforcements arrived!", zh: "增援出現！" },
   crit: { en: " CRIT!", zh: " 必殺！" },

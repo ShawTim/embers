@@ -63,7 +63,7 @@ export const ch02_pre: DialogueScript = {
 export const ch02_boss_death: DialogueScript = {
   id: "ch02_boss_death",
   lines: [
-    { speaker: "boss_garrick", text: { en: "The Lord of Endless Night... will not be stopped... by the likes... of you...", zh: "永夜之主……不會被……你們這種人……阻止……" }, mood: "sad" },
+    { speaker: "cult_captain", text: { en: "The Lord of Endless Night... will not be stopped... by the likes... of you...", zh: "永夜之主……不會被……你們這種人……阻止……" }, mood: "sad" },
     { speaker: "lyra", text: { en: "There — deeper in the forest. Do you see it? A structure. Ancient.", zh: "那裡——森林更深處。你們看到了嗎？一座建築。很古老。" }, mood: "surprised" },
     { speaker: "kael", text: { en: "A shrine. Or what remains of one. The corruption is strongest there.", zh: "一座神殿。或者說是其殘骸。腐化在那裡最強。" }, mood: "neutral" },
     { speaker: "borin", text: { en: "Whatever they're planning, we put a stop to it. Now.", zh: "不管他們在計劃什麼，我們現在就去阻止。" }, mood: "determined" },

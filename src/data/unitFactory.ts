@@ -1,6 +1,35 @@
 import type { RuntimeUnit, UnitDef } from "../types";
 import { CLASSES, WEAPONS, ITEMS, UNITS, PROMOTIONS } from "./gameData";
 
+const EXP_PER_LEVEL = 100;
+
+export function maybeLevelUp(unit: RuntimeUnit): { leveledUp: boolean; newLevel: number } {
+  let levelsGained = 0;
+  while (unit.exp >= EXP_PER_LEVEL && unit.level < 20) {
+    unit.exp -= EXP_PER_LEVEL;
+    unit.level += 1;
+    levelsGained++;
+    // Apply level-up stat growth: class growth % chance per stat
+    const classDef = unit.classDef;
+    const def = unit.def;
+    for (const stat of Object.keys(classDef.base)) {
+      const growth = classDef.growth[stat] || 0;
+      const personal = def.growthBonus?.[stat] || 0;
+      const chance = growth + personal;
+      if (Math.random() * 100 < chance) {
+        unit.stats[stat] = (unit.stats[stat] || 0) + 1;
+      }
+    }
+    // Recompute max HP if HP grew
+    if (unit.stats.hp > unit.maxHp) {
+      const diff = unit.stats.hp - unit.maxHp;
+      unit.maxHp = unit.stats.hp;
+      unit.hp += diff;
+    }
+  }
+  return { leveledUp: levelsGained > 0, newLevel: unit.level };
+}
+
 export function createUnit(defId: string, pos: { x: number; y: number }, overrides?: Partial<UnitDef>): RuntimeUnit {
   const baseDef = UNITS[defId];
   if (!baseDef) throw new Error(`Unit not found: ${defId}`);
