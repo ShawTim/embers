@@ -145,13 +145,15 @@ function CobblestoneFloor() {
         <cylinderGeometry args={[5.4, 5.4, 0.06, 64]} />
         <primitive object={tile} attach="material" />
       </mesh>
-      {/* Instanced stone tiles on top for varied cobble pattern */}
+      {/* Instanced stone tiles on top for varied cobble pattern. No
+          castShadow on the InstancedMesh — at 400 instances it is by
+          far the biggest geometry in the landing scene and saving it
+          from the shadow pass drops the landing render budget
+          noticeably. */}
       <instancedMesh
         ref={instancedRef}
         args={[undefined, undefined, 400]}
         position={[0, 0.03, 0]}
-        castShadow
-        receiveShadow
       >
         <boxGeometry args={[1, 0.05, 1]} />
         <meshStandardMaterial

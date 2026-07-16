@@ -39,8 +39,9 @@ export function Scene() {
   return (
     <Canvas
       shadows={{ type: THREE.PCFSoftShadowMap }}
+      dpr={[1, 1.5]}
       camera={{ position: [cx, grid.h * 0.9, cz + grid.h * 0.65], fov: 50, near: 0.1, far: 200 }}
-      gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping }}
+      gl={{ antialias: true, alpha: false, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping }}
       onCreated={({ gl, scene }) => {
         gl.setClearColor("#0c0e16", 1);
         scene.environment = envMap;

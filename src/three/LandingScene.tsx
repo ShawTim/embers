@@ -5,7 +5,7 @@ import { useGLTF } from "@react-three/drei";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import type { GLTF } from "three-stdlib";
 import { attachSwingWeapon, animateMelee as swingMelee, applyManualLean, type SwingState, type WeaponKind } from "./shared/SwingWeapon";
-import { spawnProjectile, spawnSlashTrail, type ProjectileKind } from "./shared/Projectile";
+import { spawnProjectile, spawnSlashTrail, tickProjectiles, tickSlashTrails, type ProjectileKind } from "./shared/Projectile";
 import { Ch1CourtyardScene } from "./shared/Ch1Courtyard";
 import { PolishGroup, polishFor, applyRimLight } from "./shared/CharacterPolish";
 
@@ -88,6 +88,10 @@ interface Combatant {
   hpTint: number;       // 0..1 redness flash
   hpTintDecay: number;
   nextAttackAt: number;  // world time when this character attacks next
+  // Cache of materials that have an `emissive` channel. The hp-tint
+  // flash only needs to mutate these (rather than `traverse` the
+  // whole skeleton every frame).
+  tintMats: THREE.MeshStandardMaterial[];
 }
 
 interface Spell {
@@ -150,9 +154,9 @@ export function LandingScene() {
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: 0, pointerEvents: "none" }}>
       <Canvas
-        shadows
         camera={{ position: [0, 3.4, 9.0], fov: 50, near: 0.1, far: 200 }}
-        gl={{ antialias: true, alpha: false, preserveDrawingBuffer: true }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
         onCreated={({ gl }: { gl: THREE.WebGLRenderer }) => gl.setClearColor("#0a0e18")}
       >
         <LandingLighting />
@@ -176,14 +180,16 @@ function LandingLighting() {
       {/* Soft cool ambient — moonlit night but still readable */}
       <ambientLight intensity={1.0} color="#8090b0" />
       <hemisphereLight args={["#a8b8d8", "#3a2a1a", 0.6]} />
-      {/* Strong key light from the moon direction — gives shape */}
+      {/* Strong key light from the moon direction — gives shape.
+          Shadows are opt-in (controlled by the Canvas's `shadows` prop);
+          when disabled, the light still contributes to shading but
+          nothing is rendered to the shadow map. */}
       <directionalLight
         position={[10, 16, -18]}
         intensity={1.8}
         color="#d0d8e8"
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
         shadow-camera-near={1}
         shadow-camera-far={40}
         shadow-camera-left={-12}
@@ -504,15 +510,13 @@ function Combatants() {
       weaponKind: d.weaponKind,
       orbColor: d.orbColor,
       mixer: null,
-      // Initial facing: each hero looks toward the villain line
-      // (roughly center of villain slots).
       targetRotY: Math.PI / 2,
       curRotY: Math.PI / 2,
       bobAmp: 0.025,
       hpTint: 0,
       hpTintDecay: 0,
-      // Stagger initial attacks across the first 2 seconds
       nextAttackAt: 0.4 + i * 0.45 + Math.random() * 0.5,
+      tintMats: [],
     })),
   );
   const [villains] = useState<Combatant[]>(() =>
@@ -528,13 +532,13 @@ function Combatants() {
       weaponKind: d.weaponKind,
       orbColor: d.orbColor,
       mixer: null,
-      // Initial facing: each villain looks toward the hero line.
       targetRotY: -Math.PI / 2,
       curRotY: -Math.PI / 2,
       bobAmp: 0.025,
       hpTint: 0,
       hpTintDecay: 0,
       nextAttackAt: 0.7 + i * 0.45 + Math.random() * 0.5,
+      tintMats: [],
     })),
   );
 
@@ -696,16 +700,17 @@ function Combatants() {
         const b = attackerArr[evt.target];
         if (!a || !b || a === b) return;
         playAnim(a, ANIM.magicShoot, false, 0.08);
-        const end = worldPos(b).clone().add(new THREE.Vector3(0, 0.9, 0));
+        const end = worldPos(b);
+        end.y = 0.9;
         a.targetRotY = Math.atan2(b.slot[0] - a.slot[0], b.slot[1] - a.slot[1]);
         faceTarget(a, b.slot[0], b.slot[1]);
         setTimeout(() => {
           for (let i = 0; i < 7; i++) {
             const angle = Math.random() * Math.PI * 2;
             const r = 0.3 + Math.random() * 0.3;
-            const p0 = new THREE.Vector3(end.x + Math.cos(angle) * r, end.y, end.z + Math.sin(angle) * r);
-            const v = new THREE.Vector3(Math.cos(angle) * 0.4, 1.2 + Math.random() * 0.4, Math.sin(angle) * 0.4);
-            spawnSpark(p0, v, new THREE.Color("#3aff90"), 0.7);
+            const p0 = _sparkTmp.set(end.x + Math.cos(angle) * r, end.y, end.z + Math.sin(angle) * r);
+            const v = _sparkVel.set(Math.cos(angle) * 0.4, 1.2 + Math.random() * 0.4, Math.sin(angle) * 0.4);
+            spawnSpark(p0, v, _HEAL_COLOR, 0.7);
           }
         }, 150);
         setTimeout(() => setIdle(a), 360);
@@ -786,43 +791,30 @@ function Combatants() {
   }
 
   function spawnSparksAt(c: Combatant, color: THREE.Color) {
-    const base = worldPos(c).add(new THREE.Vector3(0, 1.0, 0));
+    const base = worldPos(c);
+    base.y = 1.0;
     for (let i = 0; i < 6; i++) {
-      const dir = new THREE.Vector3((Math.random() - 0.5) * 2, 0.3 + Math.random() * 0.8, (Math.random() - 0.5) * 2).normalize();
-      const v = dir.multiplyScalar(1.4 + Math.random() * 0.6);
-      spawnSpark(base.clone(), v, color, 0.5);
+      const dir = _sparkDir.set((Math.random() - 0.5) * 2, 0.3 + Math.random() * 0.8, (Math.random() - 0.5) * 2).normalize();
+      const v = _sparkVel.copy(dir).multiplyScalar(1.4 + Math.random() * 0.6);
+      spawnSpark(_sparkTmp.copy(base), v, color, 0.5);
     }
   }
 
   function spawnSparks(pos: THREE.Vector3, color: THREE.Color) {
     for (let i = 0; i < 10; i++) {
-      const dir = new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 0.8, (Math.random() - 0.5) * 2).normalize();
-      const v = dir.multiplyScalar(1.5 + Math.random() * 1.0);
-      spawnSpark(pos.clone(), v, color, 0.55);
+      const dir = _sparkDir.set((Math.random() - 0.5) * 2, Math.random() * 0.8, (Math.random() - 0.5) * 2).normalize();
+      const v = _sparkVel.copy(dir).multiplyScalar(1.5 + Math.random() * 1.0);
+      spawnSpark(_sparkTmp.copy(pos), v, color, 0.55);
     }
     if (sparkGroup.current) {
-      const ringGeo = new THREE.RingGeometry(0.1, 0.4, 24);
-      const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.position.copy(pos);
-      ring.rotation.x = -Math.PI / 2;
+      const ring = makeShockRing(pos, color);
       sparkGroup.current.add(ring);
-      const t0 = performance.now();
-      const tick = () => {
-        const t = (performance.now() - t0) / 1000;
-        const k = Math.min(1, t / 0.5);
-        ring.scale.setScalar(1 + k * 4);
-        ringMat.opacity = 0.9 * (1 - k);
-        if (k < 1) requestAnimationFrame(tick);
-        else { ring.parent?.remove(ring); ringGeo.dispose(); ringMat.dispose(); }
-      };
-      tick();
     }
   }
 
   function spawnSpark(pos: THREE.Vector3, vel: THREE.Vector3, color: THREE.Color, life: number) {
     if (!sparkGroup.current) return;
-    const geo = new THREE.SphereGeometry(0.05, 6, 6);
+    const geo = SHARED_SPARK_GEO;
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.copy(pos);
@@ -849,15 +841,22 @@ function Combatants() {
         // Apply manual lean AFTER the mixer so the GLB idle animation
         // cannot push the body into a weird pose (e.g. -π headstand).
         if (c.swing) applyManualLean(c.body, c.swing.leanX, c.swing.leanZ);
+        // HP-tint flash: mutate the cached materials instead of
+        // traversing the skeleton every frame.
         if (c.hpTint > 0) {
           c.hpTint = Math.max(0, c.hpTint - delta * 2.2);
-          c.body.traverse((ch) => {
-            const m = (ch as THREE.Mesh).material as THREE.MeshStandardMaterial | undefined;
-            if (m && m.emissive) m.emissiveIntensity = 0.4 * c.hpTint;
-          });
+          const e = 0.4 * c.hpTint;
+          const mats = c.tintMats;
+          for (let i = 0; i < mats.length; i++) mats[i].emissiveIntensity = e;
         }
       }
     }
+
+    // Drive projectile + slash-trail + shock-ring animations from the
+    // single r3f frame loop (replaces per-spawn requestAnimationFrame).
+    tickProjectiles(delta);
+    tickSlashTrails(delta);
+    tickShockRings();
 
     // Independent per-character attack schedule. Each character has
     // its own cooldown; as soon as t crosses nextAttackAt, the
@@ -951,13 +950,17 @@ function LandingActor({
         }
       }
     });
-    // Faction tint: add a slight emissive based on accent
+    // Faction tint: add a slight emissive based on accent. Also
+    // build a flat cache of the materials so the hp-tint flash in
+    // useFrame doesn't have to traverse the skeleton every frame.
+    const tintMats: THREE.MeshStandardMaterial[] = [];
     c.traverse((ch: any) => {
       if (ch instanceof THREE.Mesh) {
         const m = ch.material as THREE.MeshStandardMaterial;
         if (m && m.color && def.accent) {
           m.emissive = new THREE.Color(def.accent);
           m.emissiveIntensity = 0.18;
+          tintMats.push(m);
         }
       }
     });
@@ -973,6 +976,7 @@ function LandingActor({
     combatant.lunge = lungeRef.current;
     combatant.mixer = mixer;
     combatant.slot = slot;
+    combatant.tintMats = tintMats;
     // Attach a stand-alone weapon so the swing animation has something
     // visible to rotate. The shared module also tracks a manual lean
     // override so the GLB idle animation can't push the body into a
@@ -1101,4 +1105,61 @@ function mulberry32(a: number) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// ----------------------------------------------------------------
+// Module-scope scratch + shared resources. Allocating THREE.Vector3 /
+// new THREE.SphereGeometry inside a hot loop creates a lot of GC
+// pressure on the landing page where 8 fighters attack every
+// 0.5s. We share a single small spark geometry and a few scratch
+// vectors, and drive the shock-ring expansion from a tiny registry
+// updated in useFrame.
+// ----------------------------------------------------------------
+const SHARED_SPARK_GEO = new THREE.SphereGeometry(0.05, 6, 6);
+const SHARED_RING_GEO = new THREE.RingGeometry(0.1, 0.4, 24);
+const _sparkDir = new THREE.Vector3();
+const _sparkVel = new THREE.Vector3();
+const _sparkTmp = new THREE.Vector3();
+const _HEAL_COLOR = new THREE.Color("#3aff90");
+
+interface ActiveRing {
+  mesh: THREE.Mesh;
+  mat: THREE.MeshBasicMaterial;
+  t0: number;
+  duration: number;
+}
+const ACTIVE_RINGS: ActiveRing[] = [];
+
+function makeShockRing(pos: THREE.Vector3, color: THREE.Color): THREE.Mesh {
+  // Each ring needs its own material because the colour is per
+  // impact and the opacity animates per-ring. The geometry is
+  // shared (SHARED_RING_GEO).
+  const mat = new THREE.MeshBasicMaterial({
+    color,
+    transparent: true,
+    opacity: 0.9,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const ring = new THREE.Mesh(SHARED_RING_GEO, mat);
+  ring.position.copy(pos);
+  ring.rotation.x = -Math.PI / 2;
+  ACTIVE_RINGS.push({ mesh: ring, mat, t0: performance.now() / 1000, duration: 0.5 });
+  return ring;
+}
+
+function tickShockRings() {
+  const now = performance.now() / 1000;
+  for (let i = ACTIVE_RINGS.length - 1; i >= 0; i--) {
+    const r = ACTIVE_RINGS[i];
+    const k = Math.min(1, (now - r.t0) / r.duration);
+    r.mesh.scale.setScalar(1 + k * 4);
+    r.mat.opacity = 0.9 * (1 - k);
+    if (k >= 1) {
+      r.mesh.parent?.remove(r.mesh);
+      r.mat.dispose();
+      ACTIVE_RINGS.splice(i, 1);
+    }
+  }
 }

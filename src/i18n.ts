@@ -127,6 +127,7 @@ const STRINGS = {
   faction: { en: "Faction", zh: "陣營" },
   // Stats screen
   statsTitle: { en: "Character Stats", zh: "角色能力" },
+  stats: { en: "Stats", zh: "能力" },
   attackPower: { en: "ATK", zh: "攻擊" },
   attackSpeed: { en: "AS", zh: "攻速" },
   avoid: { en: "AVO", zh: "迴避" },
