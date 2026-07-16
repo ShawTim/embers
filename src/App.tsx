@@ -30,8 +30,6 @@ export default function App() {
             {tt("leftClick")}<br />
             {tt("rightClick")}<br />
             {tt("mouseWheel")}<br /><br />
-            <strong>{tt("objective")}</strong><br />
-            {tt("objectiveDesc")}<br /><br />
             <span style={{ color: "#7af" }}>{tt("blueHint")}</span>
           </div>
           <button onClick={() => setStarted(true)}>{tt("startGame")}</button>
