@@ -12,6 +12,9 @@ import { setTileMaterialChapter } from "./shared/SceneAssets";
 import { updateWindMaterials } from "./shared/WindShader";
 import { updateWaterMaterials } from "./shared/WaterShader";
 import { PostFX } from "./PostFX";
+import { ChapterParticles } from "./AmbientParticles";
+import { VolumetricFog } from "./VolumetricFog";
+import { FootprintDecals } from "./FootprintDecals";
 
 export function Scene() {
   const grid = useGame(s => s.grid);
@@ -65,8 +68,11 @@ export function Scene() {
       />
       <directionalLight position={[cx - 8, 8, cz + 6]} intensity={0.3} color="#6080a0" />
       <hemisphereLight args={["#a0b8d8", "#3a2818", 0.3]} />
-      <fog attach="fog" args={["#141a26", 30, 80]} />
+      <fog attach="fog" args={[envCfg.fogColor, 28, 70]} />
+      <VolumetricFog w={grid.w} h={grid.h} chapterId={chapter?.id ?? "default"} />
+      <ChapterParticles chapterId={chapter?.id ?? "default"} w={grid.w} h={grid.h} />
       <TileMap grid={grid} />
+      <FootprintDecals />
       {units.filter(u => !u.isDead).map(u => <Unit3D key={u.uid} unit={u} />)}
       <CombatEffects effects={hitEffects} onDone={removeHitEffect} />
       <DamageNumbers numbers={damageNumbers} onDone={removeDamageNumber} />

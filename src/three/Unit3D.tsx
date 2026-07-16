@@ -109,6 +109,11 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const prevActed = useRef(unit.hasActed);
   const [dead, setDead] = useState(false);
   const [cloneObj, setCloneObj] = useState<THREE.Object3D | null>(null);
+  // LOD: at long camera distance the GLB is swapped for a single
+  // billboarded sprite so we don't keep animating dozens of skeletons
+  // when the player is zoomed out.
+  const billboardRef = useRef<THREE.Mesh>(null);
+  const isFarLod = useRef(false);
 
   const selectUnit = useGame(s => s.selectUnit);
   const onTileClick = useGame(s => s.onTileClick);
@@ -228,7 +233,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); if (phase !== "player") return; if (selectionMode === "targeting" && unit.faction !== "player") onTileClick(unit.pos); else if (unit.faction === "player" && !unit.hasActed) selectUnit(unit); else hoverUnit(unit); };
 
   useFrame((state, delta) => {
-    if (mixerRef.current) mixerRef.current.update(delta);
+    if (mixerRef.current && !isFarLod.current) mixerRef.current.update(delta);
     // Apply the manual lean override so the GLB idle animation can't
     // push the body into a weird pose (e.g. -π headstand). The
     // shared melee animation writes to swing.current.leanX/Z; here we
@@ -253,6 +258,30 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     if (modelRef.current && isSelected && !isMoving && !combatPhase && gs.selectionMode !== "moving") modelRef.current.position.y = Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.08;
     else if (modelRef.current) modelRef.current.position.y = THREE.MathUtils.lerp(modelRef.current.position.y, 0, 0.15);
     if (ringRef.current && (isSelected || hovered)) { const s = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.06; ringRef.current.scale.set(s, s, 1); }
+    // LOD: at long camera distance, swap the GLB for a cheap billboard
+    // so we don't keep animating dozens of skeletons. The billboard is
+    // a coloured circle facing the camera — good enough to read as a
+    // "unit" placeholder from across the map.
+    if (groupRef.current) {
+      const cam = state.camera;
+      const dx = cam.position.x - groupRef.current.position.x;
+      const dz = cam.position.z - groupRef.current.position.z;
+      const dist = Math.hypot(dx, dz);
+      const far = dist > 12;
+      if (far !== isFarLod.current) {
+        isFarLod.current = far;
+        if (modelRef.current) modelRef.current.visible = !far;
+        if (lungeGroupRef.current) {
+          // The far-LOD hides the model group; the ring still shows
+          // for selected/hovered.
+          lungeGroupRef.current.visible = !far;
+        }
+        if (billboardRef.current) billboardRef.current.visible = far;
+      }
+      if (far && billboardRef.current) {
+        billboardRef.current.lookAt(cam.position.x, billboardRef.current.getWorldPosition(new THREE.Vector3()).y, cam.position.z);
+      }
+    }
   });
 
   if (dead) return null;
@@ -263,11 +292,44 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
       <group ref={lungeGroupRef}>
         <group ref={modelRef}>{cloneObj && <primitive object={cloneObj} />}</group>
       </group>
+      <mesh ref={billboardRef} position={[0, 0.7, 0]} visible={false} renderOrder={2}>
+        <planeGeometry args={[0.7, 1.3]} />
+        <meshBasicMaterial color={factionColor} transparent opacity={0.85} depthWrite={false} side={THREE.DoubleSide} />
+      </mesh>
       {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#ff0000" transparent opacity={0.25} depthWrite={false} /></mesh>}
       {isExhausted && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} /></mesh>}
-      {unit.isBoss && <mesh position={[0, TARGET_HEIGHT + 0.3, 0]}><coneGeometry args={[0.15, 0.25, 6]} /><meshStandardMaterial color="gold" metalness={0.9} roughness={0.2} emissive="gold" emissiveIntensity={0.3} /></mesh>}
+      {unit.isBoss && <BossCrown />}
       <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh position={[-0.4 + (0.78*hpPct)/2, 0, 0.001]}><planeGeometry args={[Math.max(0.01, 0.78*hpPct), 0.06]} /><meshBasicMaterial color={hpColor} /></mesh></group>
       {selectionMode !== "moving" && <mesh position={[0, 0.7, 0]} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} onPointerDown={onPointerDown}><cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
+    </group>
+  );
+}
+
+// Boss crown — gold ring + spikes + soft glow. The material is marked
+// `__bloom = true` so the selective-bloom pass picks it up and the
+// crown reads as a glowing point of light, not a dark cone.
+function BossCrown() {
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
+  useEffect(() => {
+    if (matRef.current) (matRef.current as any).__bloom = true;
+  }, []);
+  return (
+    <group position={[0, TARGET_HEIGHT + 0.3, 0]}>
+      <mesh>
+        <coneGeometry args={[0.18, 0.28, 6]} />
+        <meshStandardMaterial
+          ref={matRef}
+          color="#ffd060"
+          metalness={0.9}
+          roughness={0.2}
+          emissive="#ffaa22"
+          emissiveIntensity={1.4}
+        />
+      </mesh>
+      <mesh position={[0, 0.22, 0]}>
+        <sphereGeometry args={[0.18, 12, 8]} />
+        <meshBasicMaterial color="#ffd060" transparent opacity={0.45} depthWrite={false} />
+      </mesh>
     </group>
   );
 }

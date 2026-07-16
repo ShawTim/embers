@@ -29,6 +29,8 @@ export interface EnvConfig {
   cloudFreq: number;
   cloudCoverage: number; // 0..1
   cloudSharpness: number;
+  // Three.js scene fog colour (linear hex string, e.g. "#1a1e2a")
+  fogColor: string;
 }
 
 const DEFAULT_CH1_NIGHT: EnvConfig = {
@@ -43,6 +45,7 @@ const DEFAULT_CH1_NIGHT: EnvConfig = {
   cloudFreq: 4,
   cloudCoverage: 0.3,
   cloudSharpness: 0.5,
+  fogColor: "#141a26",
 };
 
 const DAY_DAWN: EnvConfig = {
@@ -57,6 +60,7 @@ const DAY_DAWN: EnvConfig = {
   cloudFreq: 4,
   cloudCoverage: 0.4,
   cloudSharpness: 0.4,
+  fogColor: "#3a4458",
 };
 
 const DUNGEON_TORCH: EnvConfig = {
@@ -71,6 +75,7 @@ const DUNGEON_TORCH: EnvConfig = {
   cloudFreq: 1,
   cloudCoverage: 0.0,
   cloudSharpness: 0.5,
+  fogColor: "#0a0805",
 };
 
 const ICE_FROZEN: EnvConfig = {
@@ -85,6 +90,7 @@ const ICE_FROZEN: EnvConfig = {
   cloudFreq: 3,
   cloudCoverage: 0.5,
   cloudSharpness: 0.6,
+  fogColor: "#bcd6e8",
 };
 
 const LAVA_VOLCANIC: EnvConfig = {
@@ -99,6 +105,7 @@ const LAVA_VOLCANIC: EnvConfig = {
   cloudFreq: 5,
   cloudCoverage: 0.6,
   cloudSharpness: 0.5,
+  fogColor: "#3a0a08",
 };
 
 export function envForChapter(chapterId: string): EnvConfig {
