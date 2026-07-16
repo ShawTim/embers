@@ -220,7 +220,7 @@ export const ch09_pre: DialogueScript = {
     { speaker: "narrator", text: { en: "Dawn. The City Guard turns on the party. The traitor is revealed.", zh: "黎明。城市守衛倒戈攻擊隊伍。叛徒被揭露了。" } },
     { speaker: "darius", text: { en: "No. Not Aldric. He was my mentor. He was the best of us.", zh: "不。不是 Aldric。他是我的導師。他曾是我們之中最好的人。" }, mood: "sad" },
     { speaker: "aldric", text: { en: "I am sorry, Darius. The Lord of Endless Night offers salvation from the dying god. The Ember Throne is a lie. I do this for all of you.", zh: "對不起，Darius。永夜之主提供從垂死之神解救出來的救贖。餘燼王座是個謊言。我為你們所有人做這件事。" }, mood: "determined" },
-    { speaker: "kael", text: { en: "The path of violence is not the way. But if you will not stand down...", zh: "暴力的道路不是正確的途徑。但如果你不願意退下……" }, mood: "sad" },
+    { speaker: "kael", text: { en: "The Black Knight of Ashwood doesn't fall easily. You of all people should know that.", zh: "Ashwood 的黑騎士不會輕易倒下。你比任何人都應該清楚這一點。" }, mood: "determined" },
   ],
 };
 
@@ -245,7 +245,7 @@ export const ch10_pre: DialogueScript = {
 export const ch10_boss_death: DialogueScript = {
   id: "ch10_boss_death",
   lines: [
-    { speaker: "malachar", text: { en: "Impossible! I was the strongest of the Guardians! How can mere children—", zh: "不可能！我曾是守衛之中最強的！幾個小鬼怎麼可能——" }, mood: "surprised" },
+    { speaker: "malachar", text: { en: "Impossible! I was the strongest of the Guardians! How could a border knight best me?", zh: "不可能！我曾是守衛之中最強的！一個邊境騎士怎麼可能勝過我？" }, mood: "surprised" },
     { speaker: "lyra", text: { en: "The Ember Throne... it's flickering. The flame is dimming. But we stopped him.", zh: "餘燼王座……在閃爍。火焰在黯淡。但我們阻止了他。" }, mood: "sad" },
     { speaker: "borin", text: { en: "Wait — Malachar. He carries something. A shard of the Ember.", zh: "等一下——Malachar。他帶著什麼。餘燼的一塊碎片。" }, mood: "surprised" },
     { speaker: "darius", text: { en: "He escapes. And he has a piece of the flame. We cannot stay in this city.", zh: "他逃走了。而且他有一塊火焰碎片。我們不能留在這個城市。" }, mood: "urgent" },

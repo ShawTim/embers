@@ -86,20 +86,25 @@ export function FootprintDecals() {
     for (let i = 0; i < n; i++) {
       const e = entries.current[i];
       const age = (now - e.born) / DURATION;
-      // Lerp from source to destination across the lifetime
-      const t = Math.min(1, age * 2);
+      // Lerp from source to destination across the lifetime. We use
+      // a quick 0.3s lerp so the decal slides with the unit, then
+      // sits at the destination for the remaining 1.7s.
+      const t = Math.min(1, age * 3.3);
       const x = e.fromX + (e.toX - e.fromX) * t;
       const z = e.fromZ + (e.toZ - e.fromZ) * t;
-      dummy.position.set(x, 0.04, z);
-      // Fade out: hold 0..0.4 then fall to 0
-      const fade = age < 0.4 ? age / 0.4 : 1 - (age - 0.4) / 0.6;
-      const scale = 0.5 + 0.3 * Math.sin(age * Math.PI) + 0.05;
-      dummy.scale.set(scale, scale, scale);
+      // Sit just above the tile surface. y=0.06 keeps it above the
+      // tile (which is at y=0..0.18 with PBR material) and below the
+      // unit's feet.
+      dummy.position.set(x, 0.06, z);
+      // Size: starts small, grows to ~0.45 unit radius (covers a
+      // standard tile), then shrinks back as it fades.
+      const radius = 0.32 + 0.15 * Math.sin(Math.min(1, age * 2) * Math.PI);
+      dummy.scale.set(radius, radius, radius);
       dummy.rotation.set(-Math.PI / 2, 0, 0);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
       const c = FACTION_COLOR[e.faction] || FACTION_COLOR.neutral;
-      colorTmp.copy(c).multiplyScalar(0.7);
+      colorTmp.copy(c).multiplyScalar(0.9);
       mesh.setColorAt(i, colorTmp);
     }
     // Hide unused instances by moving them far below
@@ -112,9 +117,6 @@ export function FootprintDecals() {
     mesh.count = MAX_DECALS;
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    // Mesh material has transparent:true, but InstancedMesh doesn't
-    // accept per-instance opacity easily — the fade is done via the
-    // instance scale shrinking to zero instead.
   });
 
   return (
@@ -124,10 +126,10 @@ export function FootprintDecals() {
       frustumCulled={false}
       renderOrder={1}
     >
-      <circleGeometry args={[0.5, 24]} />
+      <circleGeometry args={[1, 24]} />
       <meshBasicMaterial
         transparent
-        opacity={0.55}
+        opacity={0.7}
         depthWrite={false}
         side={THREE.DoubleSide}
       />
