@@ -27,19 +27,19 @@ type GltfScene = GLTF & ObjectMap;
  */
 
 const MODEL_PATHS: Record<string, string> = {
-  Knight: "/models/characters/Knight.glb",
-  Barbarian: "/models/characters/Barbarian.glb",
-  Mage: "/models/characters/Mage.glb",
-  Ranger: "/models/characters/Ranger.glb",
-  Rogue: "/models/characters/Rogue.glb",
-  Rogue_Hooded: "/models/characters/Rogue_Hooded.glb",
-  Witch: "/models/characters/Witch.glb",
+  Knight: import.meta.env.BASE_URL + "models/characters/Knight.glb",
+  Barbarian: import.meta.env.BASE_URL + "models/characters/Barbarian.glb",
+  Mage: import.meta.env.BASE_URL + "models/characters/Mage.glb",
+  Ranger: import.meta.env.BASE_URL + "models/characters/Ranger.glb",
+  Rogue: import.meta.env.BASE_URL + "models/characters/Rogue.glb",
+  Rogue_Hooded: import.meta.env.BASE_URL + "models/characters/Rogue_Hooded.glb",
+  Witch: import.meta.env.BASE_URL + "models/characters/Witch.glb",
 };
 const ANIM_PATHS = {
-  general: "/models/animations/Rig_Medium_General.glb",
-  movement: "/models/animations/Rig_Medium_MovementBasic.glb",
-  melee: "/models/animations/Rig_Medium_CombatMelee.glb",
-  ranged: "/models/animations/Rig_Medium_CombatRanged.glb",
+  general: import.meta.env.BASE_URL + "models/animations/Rig_Medium_General.glb",
+  movement: import.meta.env.BASE_URL + "models/animations/Rig_Medium_MovementBasic.glb",
+  melee: import.meta.env.BASE_URL + "models/animations/Rig_Medium_CombatMelee.glb",
+  ranged: import.meta.env.BASE_URL + "models/animations/Rig_Medium_CombatRanged.glb",
 };
 for (const p of Object.values(MODEL_PATHS)) useGLTF.preload(p);
 for (const p of Object.values(ANIM_PATHS)) useGLTF.preload(p);

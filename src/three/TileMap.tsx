@@ -30,11 +30,13 @@ const TERRAIN_CFG: Record<string, { height: number; roughness: number; metalness
   bridge: { height: 0.1, roughness: 0.85, metalness: 0 },
 };
 
+const B = import.meta.env.BASE_URL;
+
 const DECOR_MODELS: Record<string, string[]> = {
-  forest: ["/models/decorations/tree_single_A.gltf", "/models/decorations/trees_A_small.gltf", "/models/decorations/trees_A_medium.gltf"],
-  thicket: ["/models/decorations/trees_A_medium.gltf", "/models/decorations/trees_A_small.gltf"],
-  mountain: ["/models/decorations/mountain_A_grass.gltf", "/models/decorations/mountain_B_grass.gltf", "/models/decorations/rock_single_A.gltf", "/models/decorations/rock_single_B.gltf"],
-  fort: ["/models/decorations/flag_blue.gltf"],
+  forest: [B + "models/decorations/tree_single_A.gltf", B + "models/decorations/trees_A_small.gltf", B + "models/decorations/trees_A_medium.gltf"],
+  thicket: [B + "models/decorations/trees_A_medium.gltf", B + "models/decorations/trees_A_small.gltf"],
+  mountain: [B + "models/decorations/mountain_A_grass.gltf", B + "models/decorations/mountain_B_grass.gltf", B + "models/decorations/rock_single_A.gltf", B + "models/decorations/rock_single_B.gltf"],
+  fort: [B + "models/decorations/flag_blue.gltf"],
 };
 
 export function TileMap({ grid }: { grid: GameGrid }) {

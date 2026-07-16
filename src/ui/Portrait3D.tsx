@@ -15,7 +15,7 @@ const MOOD_COLORS: Record<string, string> = {
 // Animation rig paths — we run the Idle_A clip on the portrait model
 // so it doesn't display in T-pose / A-pose. The same animation
 // collections are used by Unit3D.
-const IDLE_RIG = "/models/animations/Rig_Medium_General.glb";
+const IDLE_RIG = import.meta.env.BASE_URL + "models/animations/Rig_Medium_General.glb";
 useGLTF.preload(IDLE_RIG);
 
 export function Portrait3D({ modelId, mood }: { modelId: string; mood?: string }) {
