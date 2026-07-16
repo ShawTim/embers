@@ -1,10 +1,11 @@
 import { useGame } from "../game/store";
 import { posKey } from "../game/grid";
 import { t, unitName, className, factionName } from "../i18n";
-import { ITEMS } from "../data/gameData";
+import { ITEMS, WEAPONS } from "../data/gameData";
 import type { RuntimeUnit } from "../types";
 import type { Lang } from "../i18n";
 import { useState } from "react";
+import { Portrait3D } from "./Portrait3D";
 
 export function ActionMenu() {
   const selectionMode = useGame(s => s.selectionMode);
@@ -26,7 +27,6 @@ export function ActionMenu() {
 
   if (!selectionMode || !selectedUnit || !pendingMove || !grid) return null;
 
-  // If clicking an enemy unit directly, show stats
   if (selectionMode === "idle" || selectionMode === "enemyInfo") {
     if (selectedUnit.faction !== "player") {
       return <StatsOverlay unit={selectedUnit} lang={lang} onClose={() => useGame.getState().deselectUnit()} />;
@@ -74,8 +74,8 @@ export function ActionMenu() {
     const items = convoy.filter(c => c.type === "item");
     return (
       <div className="action-menu" style={style}>
-        <button onClick={() => setSubmenu("main")}>↩ {tt("cancel")}</button>
-        {items.map((c, i) => { const item = ITEMS[c.id]; if (!item) return null; return <button key={i} onClick={() => { useItemAction(c.id); setSubmenu("main"); }}>{itemName(c.id)} ({c.uses} {tt("uses")})</button>; })}
+        <button onClick={() => setSubmenu(null!)}>↩ {tt("cancel")}</button>
+        {items.map((c, i) => { const item = ITEMS[c.id]; if (!item) return null; return <button key={i} onClick={() => { useItemAction(c.id); setSubmenu(null!); }}>{itemName(c.id)} ({c.uses} {tt("uses")})</button>; })}
         {items.length === 0 && <button disabled>{tt("noItems")}</button>}
       </div>
     );
@@ -84,9 +84,9 @@ export function ActionMenu() {
   if (submenu === "equip") {
     return (
       <div className="action-menu" style={style}>
-        <button onClick={() => setSubmenu("main")}>↩ {tt("cancel")}</button>
+        <button onClick={() => setSubmenu(null!)}>↩ {tt("cancel")}</button>
         {selectedUnit.weapons.map((w, i) => (
-          <button key={i} onClick={() => { equipWeaponAction(i); setSubmenu("main"); }} style={w === selectedUnit.equippedWeapon ? { color: "#6c6" } : {}}>
+          <button key={i} onClick={() => { equipWeaponAction(i); setSubmenu(null!); }} style={w === selectedUnit.equippedWeapon ? { color: "#6c6" } : {}}>
             {w === selectedUnit.equippedWeapon ? "✓ " : ""}{w.name} {tt("might")}{w.might}
           </button>
         ))}
@@ -120,6 +120,8 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
   const hit = wpn ? wpn.hit + unit.stats.skl * 2 + Math.floor(unit.stats.lck / 2) : 0;
   const crit = wpn ? wpn.crit + Math.floor(unit.stats.skl / 2) : 0;
   const fc = unit.faction === "player" ? "#5a8adb" : unit.faction === "enemy" ? "#db5a5a" : "#5adb5a";
+  const desc = unit.def.desc || "";
+  const unitModelId = (unit as any)._dialogModelId || unit.modelId;
 
   return (
     <>
@@ -133,11 +135,24 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
           <button className="btn-close" onClick={onClose}>✕</button>
         </div>
         <div className="stats-panel-body">
-          <div className="stats-panel-class">{tt("level")}{unit.level} {className(unit.classDef.id, lang)}{unit.classDef.tier === 2 ? " ★" : ""}</div>
+          {/* Avatar + description */}
+          <div className="stats-panel-top">
+            <div className="stats-panel-avatar">
+              <Portrait3D modelId={unitModelId} mood="neutral" />
+            </div>
+            <div className="stats-panel-info">
+              <div className="stats-panel-class">{tt("level")}{unit.level} {className(unit.classDef.id, lang)}{unit.classDef.tier === 2 ? " ★" : ""}</div>
+              <div className="stats-panel-desc">{desc}</div>
+            </div>
+          </div>
+
+          {/* HP */}
           <div className="stats-panel-hp">
             <div className="stats-panel-hp-bar"><div className="stats-panel-hp-fill" style={{ width: `${pct}%`, background: hpColor }} /></div>
-            <span style={{ color: hpColor, fontWeight: 700, fontSize: 13 }}>{unit.hp}/{unit.maxHp} {tt("hp")}</span>
+            <span style={{ color: hpColor, fontWeight: 700, fontSize: 13, whiteSpace: "nowrap" }}>{unit.hp}/{unit.maxHp} {tt("hp")}</span>
           </div>
+
+          {/* Stats grid */}
           <div className="stats-panel-grid">
             {statKeys.map(([k, v]) => (
               <div key={k} className="stats-panel-stat">
@@ -147,27 +162,28 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
               </div>
             ))}
           </div>
+
+          {/* Derived combat stats */}
           <div className="stats-panel-derived">
             <span>{tt("attackPower")} <strong>{atk}</strong></span>
             <span>{tt("attackSpeed")} <strong>{as}</strong></span>
             <span>{tt("hitRate")} <strong>{hit}</strong></span>
             <span>{tt("critRate")} <strong>{crit}%</strong></span>
           </div>
-          {wpn && (
-            <div className="stats-panel-weapon">
-              <strong>{tt("equipped")}:</strong> {wpn.name}
-              <span> {tt("might")}{wpn.might} · {tt("hit")}{wpn.hit}% · {tt("weight")}{wpn.weight}{wpn.crit > 0 ? ` · ${tt("crt")}${wpn.crit}%` : ""}{wpn.minRange !== 1 || wpn.maxRange !== 1 ? ` · ${tt("range")}${wpn.minRange}-${wpn.maxRange}` : ""}</span>
-            </div>
-          )}
-          {unit.weapons.length > 1 && (
-            <div className="stats-panel-weapons">
-              {unit.weapons.map((w, i) => (
-                <div key={i} style={{ color: w === unit.equippedWeapon ? "#6c6" : "#789", fontSize: 12 }}>
-                  {w === unit.equippedWeapon ? "✓ " : ""}{w.name}
-                </div>
-              ))}
-            </div>
-          )}
+
+          {/* Equipment */}
+          <div className="stats-panel-equip-section">
+            <div className="stats-panel-section-title">{tt("inventory")}</div>
+            {unit.weapons.map((w, i) => (
+              <div key={i} className={`stats-panel-weapon-row ${w === unit.equippedWeapon ? "equipped" : ""}`}>
+                <span className="wpn-check">{w === unit.equippedWeapon ? "✓" : ""}</span>
+                <span className="wpn-name">{w.name}</span>
+                <span className="wpn-stats">{tt("might")}{w.might} {tt("hit")}{w.hit} {tt("weight")}{w.weight}{w.crit > 0 ? ` ${tt("crt")}${w.crit}` : ""}{w.minRange !== 1 || w.maxRange !== 1 ? ` ${tt("range")}${w.minRange}-${w.maxRange}` : ""}</span>
+                <span className="wpn-triangle">{w.triangle !== "none" ? w.triangle.toUpperCase() : ""}</span>
+                <span className="wpn-uses">{w.uses}{tt("uses")}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </>

@@ -415,7 +415,7 @@ export const ch18_pre: DialogueScript = {
 export const ch18_boss_death: DialogueScript = {
   id: "ch18_boss_death",
   lines: [
-    { speaker: "zethar", text: { en: "Impossible. I held this flame for a thousand years. I knew its every secret. How can one boy—", zh: "不可能。我守護這火焰一千年。我知道它所有秘密。一個少年怎麼可能——" }, mood: "surprised" },
+    { speaker: "zethar", text: { en: "Impossible. I held this flame for a thousand years. I knew its every secret. How can one knight—", zh: "不可能。我守護這火焰一千年。我知道它所有秘密。一個騎士怎麼可能——" }, mood: "surprised" },
     { speaker: "lyra", text: { en: "He carries the Ember now. I am its vessel. And the flame is not what it was — it is what it is meant to be. Renewed, through sacrifice. Through love.", zh: "他現在帶著餘燼。我是它的器皿。而火焰不是它曾經的樣子——是它應該成爲的樣子。更新了，通過犧牲。通過愛。" }, mood: "determined" },
     { speaker: "zethar", text: { en: "Through... love? You would choose this path? You would bear this weight? For a world that knows you not?", zh: "通過……愛？你會選擇這條路？你會承擔這重量？為一個不認識你的世界？" }, mood: "neutral" },
     { speaker: "kael", text: { en: "Yes. For Lyra. For the people. For you — who deserved better than a thousand years of silent suffering.", zh: "是的。為萊拉。為人民。為你——你值得比一千年沉默的痛苦更好嘅對待。" }, mood: "determined" },
