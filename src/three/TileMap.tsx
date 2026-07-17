@@ -110,7 +110,7 @@ function hoverModeForTile(inMove: boolean, inAttack: boolean, selMode: string | 
   return null;
 }
 
-function TileHoverOverlay({ pos, height, mode }: { pos: Pos; height: number; mode: HoverMode | null }) {
+function TileHoverOverlay({ height, mode }: { pos: Pos; height: number; mode: HoverMode | null }) {
   const matRef = useRef<THREE.ShaderMaterial | null>(null);
   const mat = useMemo(() => mode ? makeHoverMaterial(mode) : null, [mode]);
   useFrame((state) => {
@@ -118,7 +118,7 @@ function TileHoverOverlay({ pos, height, mode }: { pos: Pos; height: number; mod
   });
   if (!mat) return null;
   return (
-    <mesh position={[pos.x, height + 0.005, pos.y]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={5}>
+    <mesh position={[0, height + 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={5}>
       <planeGeometry args={[0.96, 0.96]} />
       <primitive object={mat} attach="material" ref={matRef as any} />
     </mesh>
