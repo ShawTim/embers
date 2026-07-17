@@ -24,8 +24,11 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
 
-  // For GLB/gltf/bin/png assets — cache-first
   const url = new URL(req.url);
+  if (url.protocol !== "http:" && url.protocol !== "https:") return;
+  if (url.origin !== self.location.origin && !url.pathname.match(/\.(glb|gltf|bin|png)$/)) return;
+
+  // For GLB/gltf/bin/png assets — cache-first
   if (url.pathname.match(/\.(glb|gltf|bin|png|jpg|jpeg|svg|woff2?)$/)) {
     event.respondWith(
       caches.match(req).then((cached) => {
