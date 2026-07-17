@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useGame } from "./game/store";
 import { Scene } from "./three/Scene";
+import { LandingScene } from "./three/LandingScene";
 import { HUD } from "./ui/HUD";
 import { DialogueBox } from "./ui/DialogueBox";
+import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -118,18 +120,26 @@ export default function App() {
 
   if (phase === "menu") {
     return (
-      <div className="start-screen">
-        <h1>{tt("gameTitle")}</h1>
-        <div className="subtitle">{tt("subtitle")}</div>
-        <div className="controls-box">
-          <strong>{tt("controls")}</strong><br />
-          {tt("leftClick")}<br />
-          {tt("rightClick")}<br />
-          {tt("mouseWheel")}<br /><br />
-          <span style={{ color: "#7af" }}>{tt("blueHint")}</span>
+      <>
+        <LandingScene />
+        <div className="start-screen">
+          <div className="lang-toggle-wrap">
+            <LangToggle />
+          </div>
+          <div className="start-card">
+            <h1>{tt("gameTitle")}</h1>
+            <div className="subtitle">{tt("subtitle")}</div>
+            <div className="controls-box">
+              <strong>{tt("controls")}</strong><br />
+              {tt("leftClick")}<br />
+              {tt("rightClick")}<br />
+              {tt("mouseWheel")}<br /><br />
+              <span style={{ color: "#7af" }}>{tt("blueHint")}</span>
+            </div>
+            <button onClick={() => setPhase("game")}>{tt("startGame")}</button>
+          </div>
         </div>
-        <button onClick={() => setPhase("game")}>{tt("startGame")}</button>
-      </div>
+      </>
     );
   }
 
