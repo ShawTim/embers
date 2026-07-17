@@ -15,6 +15,8 @@ import { PostFX } from "./PostFX";
 import { ChapterParticles } from "./AmbientParticles";
 import { VolumetricFog } from "./VolumetricFog";
 import { FootprintDecals } from "./FootprintDecals";
+import { BattlefieldDecals } from "./BattlefieldDecals";
+import { SkyDome } from "./SkyDome";
 
 export function Scene() {
   const grid = useGame(s => s.grid);
@@ -50,6 +52,7 @@ export function Scene() {
       }}
     >
       <CameraController w={grid.w} h={grid.h} />
+      <SkyDome chapterId={chapter?.id ?? "default"} />
       <ambientLight intensity={0.45} color="#b0c4de" />
       <directionalLight
         position={[cx + 4, 18, cz - 4]}
@@ -74,6 +77,7 @@ export function Scene() {
       <ChapterParticles chapterId={chapter?.id ?? "default"} w={grid.w} h={grid.h} />
       <TileMap grid={grid} />
       <FootprintDecals />
+      <BattlefieldDecals />
       {units.filter(u => !u.isDead).map(u => <Unit3D key={u.uid} unit={u} />)}
       <CombatEffects effects={hitEffects} onDone={removeHitEffect} />
       <DamageNumbers numbers={damageNumbers} onDone={removeDamageNumber} />

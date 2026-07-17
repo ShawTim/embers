@@ -32,6 +32,8 @@ interface GameState {
   lang: Lang;
   hitEffects: { id: number; position: [number, number, number]; isCrit: boolean }[];
   damageNumbers: { id: number; position: [number, number, number]; amount: number; isCrit: boolean; isHeal: boolean; isMiss: boolean }[];
+  healAuras: { id: number; position: [number, number, number]; born: number }[];
+  bloodDecals: { id: number; position: [number, number, number]; born: number }[];
   screenShake: number;
   activeCombat: { attacker: RuntimeUnit; defender: RuntimeUnit } | null;
   combatPhase: { phase: string; attackerId: string; defenderId: string; isCounter: boolean } | null;
@@ -55,6 +57,10 @@ interface GameState {
   clearCombatPreview: () => void;
   addHitEffect: (p: [number, number, number], crit: boolean) => void;
   removeHitEffect: (id: number) => void;
+  addHealAura: (p: [number, number, number]) => void;
+  removeHealAura: (id: number) => void;
+  addBloodDecal: (p: [number, number, number]) => void;
+  removeBloodDecal: (id: number) => void;
   addDamageNumber: (p: [number, number, number], amt: number, opts?: { isCrit?: boolean; isHeal?: boolean; isMiss?: boolean }) => void;
   removeDamageNumber: (id: number) => void;
   triggerShake: (amt: number) => void;
@@ -76,7 +82,7 @@ export const useGame = create<GameState>((set, get) => ({
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
-  hitEffects: [], damageNumbers: [], screenShake: 0, activeCombat: null, combatPhase: null,
+  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, activeCombat: null, combatPhase: null,
   activeDialogue: null,
   convoy: [
     { id: "vulnerary", type: "item", uses: 3 },
@@ -123,7 +129,7 @@ export const useGame = create<GameState>((set, get) => ({
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
     const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], activeCombat: null, combatPhase: null, activeDialogue: preDialogue });
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], activeCombat: null, combatPhase: null, activeDialogue: preDialogue });
   },
 
   selectUnit: (u) => {
@@ -190,8 +196,8 @@ export const useGame = create<GameState>((set, get) => ({
       setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
     }
     setP("exit", "", ""); await sleep(300);
-    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); }
-    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); }
+    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); }
+    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); }
     if (!atk.isDead) {
       atk.exp += calculateExp(atk, target, target.isDead);
       const { leveledUp, newLevel } = maybeLevelUp(atk);
@@ -219,6 +225,7 @@ export const useGame = create<GameState>((set, get) => ({
     healer.hasActed = true;
     get().addLog(t("logHeal", get().lang, { healer: unitName(healer.def.id, get().lang), target: unitName(target.def.id, get().lang), n: actual }), "#3aff3a");
     get().addDamageNumber([target.pos.x, 1.5, target.pos.y], actual, { isHeal: true });
+    get().addHealAura([target.pos.x, 0.22, target.pos.y]);
     set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()] });
   },
 
@@ -260,8 +267,8 @@ export const useGame = create<GameState>((set, get) => ({
           setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
         }
         setP("exit", "", ""); await sleep(300);
-        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); }
-        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); }
+        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); }
+        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); }
         if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u); }
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
@@ -270,6 +277,7 @@ export const useGame = create<GameState>((set, get) => ({
         u.exp += 20; maybeLevelUp(u);
         get().addLog(t("logHeal", get().lang, { healer: unitName(u.def.id, get().lang), target: unitName(dec.healTarget.def.id, get().lang), n: actual }), "#3aff8a");
         get().addDamageNumber([dec.healTarget.pos.x, 1.5, dec.healTarget.pos.y], actual, { isHeal: true });
+        get().addHealAura([dec.healTarget.pos.x, 0.22, dec.healTarget.pos.y]);
         set({ units: [...g.getAllUnits()] }); await sleep(300);
       }
     }
@@ -288,6 +296,10 @@ export const useGame = create<GameState>((set, get) => ({
 
   addHitEffect: (p, crit) => set(s => ({ hitEffects: [...s.hitEffects, { id: Date.now() + Math.random(), position: p, isCrit: crit }] })),
   removeHitEffect: (id) => set(s => ({ hitEffects: s.hitEffects.filter(e => e.id !== id) })),
+  addHealAura: (p) => set(s => ({ healAuras: [...(s.healAuras || []), { id: Date.now() + Math.random(), position: p, born: performance.now() / 1000 }] })),
+  removeHealAura: (id) => set(s => ({ healAuras: (s.healAuras || []).filter(a => a.id !== id) })),
+  addBloodDecal: (p) => set(s => ({ bloodDecals: [...(s.bloodDecals || []), { id: Date.now() + Math.random(), position: p, born: performance.now() / 1000 }] })),
+  removeBloodDecal: (id) => set(s => ({ bloodDecals: (s.bloodDecals || []).filter(a => a.id !== id) })),
   addDamageNumber: (p, amt, opts = {}) => set(s => ({ damageNumbers: [...s.damageNumbers, { id: Date.now() + Math.random(), position: p, amount: amt, isCrit: opts.isCrit || false, isHeal: opts.isHeal || false, isMiss: opts.isMiss || false }] })),
   removeDamageNumber: (id) => set(s => ({ damageNumbers: s.damageNumbers.filter(n => n.id !== id) })),
   triggerShake: (amt) => set({ screenShake: amt }),

@@ -228,7 +228,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   }, [combatPhase, activeCombat, unit.uid]);
 
   useEffect(() => { if (isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idleB || ANIM.idle, true, 0.2); else if (!isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idle, true, 0.3); }, [isSelected]);
-  useEffect(() => { if (unit.hp < prevHp.current) { setFlashRed(true); const tm = setTimeout(() => setFlashRed(false), 400); prevHp.current = unit.hp; return () => clearTimeout(tm); } prevHp.current = unit.hp; }, [unit.hp]);
+  useEffect(() => { if (unit.hp < prevHp.current) { setFlashRed(true); const tm = setTimeout(() => setFlashRed(false), 120); prevHp.current = unit.hp; return () => clearTimeout(tm); } prevHp.current = unit.hp; }, [unit.hp]);
   useEffect(() => { if (unit.isDead && !dead) { playAnim(ANIM.deathA, false, 0.2); const tm = setTimeout(() => setDead(true), 2000); return () => clearTimeout(tm); } }, [unit.isDead]);
 
   const onPointerEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; hoverUnit(unit); if (selectionMode === "targeting" && unit.faction !== "player") { const sel = useGame.getState().selectedUnit; if (sel) showCombatPreview(sel, unit); } };
@@ -299,7 +299,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
         <planeGeometry args={[0.7, 1.3]} />
         <meshBasicMaterial color={factionColor} transparent opacity={0.85} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-      {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#ff0000" transparent opacity={0.25} depthWrite={false} /></mesh>}
+      {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 12, 12]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} /></mesh>}
       {isExhausted && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} /></mesh>}
       {unit.isBoss && <BossCrown />}
       <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh position={[-0.4 + (0.78*hpPct)/2, 0, 0.001]}><planeGeometry args={[Math.max(0.01, 0.78*hpPct), 0.06]} /><meshBasicMaterial color={hpColor} /></mesh></group>
