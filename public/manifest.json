@@ -1,0 +1,18 @@
+{
+  "name": "Embers",
+  "short_name": "Embers",
+  "description": "A tactical SRPG in the spirit of Fire Emblem",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    {
+      "src": "favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ]
+}
