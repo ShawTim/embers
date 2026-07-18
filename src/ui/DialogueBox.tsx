@@ -5,6 +5,7 @@ import { unitName, t } from "../i18n";
 import { Portrait3D } from "./Portrait3D";
 import { audio } from "../audio/engine";
 import { MODEL_PATHS } from "../three/Unit3D";
+import { UNITS } from "../data/gameData";
 
 // Map unit def.id to modelId for portraits
 const UNIT_MODELS: Record<string, string> = {
@@ -64,6 +65,12 @@ export function DialogueBox() {
   const isNarrator = line.speaker === "narrator";
   const speakerDisplayName = isNarrator ? null : (line.speakerName ? line.speakerName[lang] : unitName(line.speaker, lang));
   const modelId = UNIT_MODELS[line.speaker] || "Knight";
+  // Pull the speaker's portrait color + class title from the unit defs
+  // so the 3D portrait has a coloured "energy" rim and a name plate.
+  const speakerUnit = UNITS[line.speaker];
+  const speakerTitle = speakerUnit
+    ? t(("c_" + speakerUnit.classId) as any, lang)
+    : undefined;
 
   const advance = () => {
     if (isTyping) {
@@ -86,7 +93,13 @@ export function DialogueBox() {
         {/* Portrait */}
         {!isNarrator && (
           <div className="dialogue-portrait">
-            <Portrait3D modelId={modelId} mood={line.mood} />
+            <Portrait3D
+              modelId={modelId}
+              unitId={line.speaker}
+              mood={line.mood}
+              namePlate={speakerDisplayName || undefined}
+              title={speakerTitle}
+            />
           </div>
         )}
 
@@ -96,7 +109,13 @@ export function DialogueBox() {
             <div className="dialogue-narrator-text">{displayedText}</div>
           ) : (
             <>
-              <div className="dialogue-speaker" style={{ color: line.mood === "angry" ? "#f66" : line.mood === "sad" ? "#68a" : "#8cf" }}>
+              <div
+                className="dialogue-speaker"
+                style={{
+                  color: line.mood === "angry" ? "#f66" : line.mood === "sad" ? "#68a" : (speakerUnit?.portraitColor || "#8cf"),
+                  textShadow: `0 0 8px ${speakerUnit?.portraitColor || "#8cf"}55`,
+                }}
+              >
                 {speakerDisplayName}
               </div>
               <div className="dialogue-text">{displayedText}</div>

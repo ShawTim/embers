@@ -9,6 +9,7 @@ import { CritFlash } from "./ui/CritFlash";
 import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
 import { audio } from "./audio/engine";
+import { save as saveSystem } from "./game/save";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -138,6 +139,7 @@ export default function App() {
   }
 
   if (phase === "menu") {
+    const hasAuto = saveSystem.hasAutosave();
     return (
       <>
         <LandingScene />
@@ -156,6 +158,12 @@ export default function App() {
               <span style={{ color: "#7af" }}>{tt("blueHint")}</span>
             </div>
             <button onClick={() => { audio.unlock(); audio.play("menu"); audio.startMusic("title"); setPhase("game"); }}>{tt("startGame")}</button>
+            {hasAuto && (
+              <button
+                style={{ marginTop: 8, background: "linear-gradient(180deg, #3a5a3a, #1a3a1a)" }}
+                onClick={() => { audio.unlock(); audio.play("select"); audio.startMusic("title"); const ok = useGame.getState().loadAutosave(); if (ok) setPhase("game"); }}
+              >▶ {tt("autosave")}</button>
+            )}
           </div>
         </div>
       </>

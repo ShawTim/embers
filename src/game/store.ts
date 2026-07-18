@@ -4,12 +4,13 @@ import { GameGrid, type Pos, posKey } from "./grid";
 import { createUnit, useItemOnUnit, maybeLevelUp } from "../data/unitFactory";
 import { resolveCombat, calculateExp, type CombatPreview, previewCombat } from "./combat";
 import { decideAIAction, type AIDecision } from "./ai";
-import { CHAPTERS } from "../data/gameData";
+import { CHAPTERS, WEAPONS } from "../data/gameData";
 import type { Lang } from "../i18n";
 import { t, unitName, chapterInfo } from "../i18n";
 import { getDialogueForTrigger } from "../data/dialogues";
 import { audio } from "../audio/engine";
-import type { WeaponType } from "../types";
+import type { WeaponType, WeaponDef } from "../types";
+import { save as saveSystem, type SavePayload, type SerializedUnit } from "./save";
 
 function weaponSfxName(w: WeaponType | undefined): string | null {
   if (!w) return "hit_sword";
@@ -121,6 +122,12 @@ interface GameState {
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
   addToConvoy: (id: string, type: "weapon" | "item", uses?: number) => void;
+  // Save / load
+  saveToSlot: (slotId: string) => boolean;
+  loadFromSlot: (slotId: string) => boolean;
+  loadAutosave: () => boolean;
+  hasAutosave: () => boolean;
+  autosave: () => boolean;
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
@@ -338,6 +345,9 @@ export const useGame = create<GameState>((set, get) => ({
 
   endPlayerTurn: () => {
     const st = get(); if (st.phase !== "player") return;
+    // Auto-save right before the player turn ends so the player can always
+    // resume from this exact state.
+    get().autosave();
     set({ phase: "enemy", selectedUnit: null, moveRange: new Map(), attackRange: [], selectionMode: "idle" });
     setTimeout(() => get().processEnemyTurn(), 500);
   },
@@ -495,7 +505,163 @@ export const useGame = create<GameState>((set, get) => ({
     }
   },
   addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
+
+  saveToSlot: (slotId) => {
+    const st = get();
+    if (!st.chapter || !st.grid) return false;
+    const chapterIndex = CHAPTERS.findIndex(c => c.id === st.chapter!.id);
+    if (chapterIndex < 0) return false;
+    const payload: Omit<SavePayload, "version" | "savedAt"> = {
+      chapterId: st.chapter.id,
+      chapterIndex,
+      turn: st.turn,
+      phase: st.phase,
+      units: st.units.map(u => ({
+        uid: u.uid,
+        defId: u.def.id,
+        pos: { ...u.pos },
+        hp: u.hp,
+        exp: u.exp,
+        level: u.level,
+        stats: { ...u.stats },
+        weapons: u.weapons.map(w => w.id),
+        equippedWeaponIdx: u.equippedWeapon ? u.weapons.findIndex(w => w.id === u.equippedWeapon!.id) : -1,
+        hasMoved: u.hasMoved,
+        hasActed: u.hasActed,
+        isDead: u.isDead,
+        isBoss: u.isBoss,
+        aiType: u.aiType,
+        faction: u.faction,
+        modelId: u.modelId,
+      })),
+      convoy: [...st.convoy],
+      lang: st.lang,
+    };
+    return saveSystem.write(payload, slotId);
+  },
+
+  loadFromSlot: (slotId) => {
+    const payload = saveSystem.read(slotId);
+    if (!payload) return false;
+    return applySavePayload(set, get, payload);
+  },
+
+  loadAutosave: () => {
+    const payload = saveSystem.readAutosave();
+    if (!payload) return false;
+    return applySavePayload(set, get, payload);
+  },
+
+  hasAutosave: () => saveSystem.hasAutosave(),
+
+  autosave: () => {
+    const st = get();
+    if (!st.chapter || !st.grid || st.phase !== "player") return false;
+    const chapterIndex = CHAPTERS.findIndex(c => c.id === st.chapter!.id);
+    if (chapterIndex < 0) return false;
+    const payload: Omit<SavePayload, "version" | "savedAt"> = {
+      chapterId: st.chapter.id,
+      chapterIndex,
+      turn: st.turn,
+      phase: st.phase,
+      units: st.units.map(u => ({
+        uid: u.uid,
+        defId: u.def.id,
+        pos: { ...u.pos },
+        hp: u.hp,
+        exp: u.exp,
+        level: u.level,
+        stats: { ...u.stats },
+        weapons: u.weapons.map(w => w.id),
+        equippedWeaponIdx: u.equippedWeapon ? u.weapons.findIndex(w => w.id === u.equippedWeapon!.id) : -1,
+        hasMoved: u.hasMoved,
+        hasActed: u.hasActed,
+        isDead: u.isDead,
+        isBoss: u.isBoss,
+        aiType: u.aiType,
+        faction: u.faction,
+        modelId: u.modelId,
+      })),
+      convoy: [...st.convoy],
+      lang: st.lang,
+    };
+    return saveSystem.write(payload, null);
+  },
 }));
+
+function applySavePayload(set: any, get: any, payload: SavePayload): boolean {
+  try {
+    const ch = CHAPTERS[payload.chapterIndex] || CHAPTERS.find(c => c.id === payload.chapterId);
+    if (!ch) return false;
+    const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
+    for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
+    const units: RuntimeUnit[] = [];
+    for (const s of payload.units) {
+      const u = createUnit(s.defId, s.pos, { aiType: s.aiType, isBoss: s.isBoss });
+      (u as any).uid = s.uid;
+      u.hp = s.hp;
+      u.exp = s.exp;
+      u.level = s.level;
+      u.stats = { ...s.stats };
+      if (s.weapons.length > 0) {
+        const weapons: WeaponDef[] = s.weapons
+          .map((wid: string) => WEAPONS[wid])
+          .filter(Boolean) as WeaponDef[];
+        if (weapons.length > 0) {
+          (u as any).weapons = weapons;
+          (u as any).equippedWeapon = weapons[Math.max(0, s.equippedWeaponIdx)] || weapons[0];
+        }
+      }
+      u.hasMoved = s.hasMoved;
+      u.hasActed = s.hasActed;
+      u.isDead = s.isDead;
+      u.modelId = s.modelId || u.modelId;
+      if (!u.isDead) grid.placeUnit(u, u.pos);
+      units.push(u);
+    }
+    set({
+      grid,
+      chapter: ch,
+      units,
+      phase: "player",
+      turn: payload.turn,
+      selectedUnit: null,
+      hoveredUnit: null,
+      hoveredTile: null,
+      moveRange: new Map(),
+      attackRange: [],
+      selectionMode: "idle",
+      pendingMove: null,
+      combatPreview: null,
+      combatLog: [],
+      objectiveText: chapterInfo(ch.id, "obj", payload.lang),
+      message: null,
+      hitEffects: [],
+      damageNumbers: [],
+      healAuras: [],
+      bloodDecals: [],
+      screenShake: 0,
+      timeScale: 1,
+      slowMoUntil: 0,
+      bossEntrance: null,
+      activeCombat: null,
+      combatPhase: null,
+      activeDialogue: null,
+      _bossIntroDone: false,
+      pendingProjectiles: [],
+      pendingSlashTrails: [],
+      lastAction: null,
+      chapterIntro: null,
+      convoy: [...payload.convoy],
+      lang: payload.lang,
+      critEvent: 0,
+    } as any);
+    audio.play("menu");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function checkBattleEnd(set: any, get: any) {
   const s: GameState = get();
@@ -504,41 +670,29 @@ function checkBattleEnd(set: any, get: any) {
   const lord = s.units.find((u: RuntimeUnit) => u.def.isLord);
   if (!players.length || lord?.isDead) { set({ phase: "defeat", message: t("defeat", get().lang) }); return; }
   const ch = s.chapter; if (!ch) return;
-  if (ch.objectiveType === "route" && !enemies.length) {
-    const vd = getDialogueForTrigger(ch.id, "victory");
-    set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
-  }
+  let won = false;
+  if (ch.objectiveType === "route" && !enemies.length) won = true;
   else if (ch.objectiveType === "boss") {
-    // Look up the boss from the grid (which keeps dead bosses removed) AND
-    // from any dead-unit reference — but since `g.removeUnit` removes the
-    // unit from the grid entirely, we need to track dead bosses separately.
-    // Simpler: check the live enemy list for any boss still alive; if no
-    // boss is alive at all (i.e. the boss was killed and removed), win.
     const liveBoss = s.units.find((u: RuntimeUnit) => u.isBoss && !u.isDead);
     if (!liveBoss) {
       const bd = getDialogueForTrigger(ch.id, "boss_death");
-      const vd = getDialogueForTrigger(ch.id, "victory");
-      // Show boss death dialogue first if exists
       if (bd && !s.activeDialogue) { set({ activeDialogue: bd }); return; }
-      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+      won = true;
     }
   }
   else if (ch.objectiveType === "defend") {
-    // Win when the turn counter has reached the survival target.
     const need = ch.objectiveTurns ?? 99;
-    if (s.turn >= need) {
-      const vd = getDialogueForTrigger(ch.id, "victory");
-      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
-    }
+    if (s.turn >= need) won = true;
   }
   else if (ch.objectiveType === "seize" && ch.seizeTile) {
-    // Win when any living player unit is standing on the seize tile.
     const stTile = ch.seizeTile;
     const onTile = players.some((u: RuntimeUnit) => u.pos.x === stTile.x && u.pos.y === stTile.y);
-    if (onTile) {
-      const vd = getDialogueForTrigger(ch.id, "victory");
-      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
-    }
+    if (onTile) won = true;
+  }
+  if (won) {
+    saveSystem.markChapterComplete(ch.id);
+    const vd = getDialogueForTrigger(ch.id, "victory");
+    set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
   }
 }
 
