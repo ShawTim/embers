@@ -178,6 +178,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   // ref tweens over ~0.3s so the bar drains like a real RPG.
   const displayedHp = useRef(hpPct);
   const hpBarMesh = useRef<THREE.Mesh>(null);
+  const hpGhostMesh = useRef<THREE.Mesh>(null);
   const MOVE_DURATION = 500;
 
   useEffect(() => {
@@ -301,12 +302,23 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
       deathAge.current += sd;
       const t = Math.min(1, deathAge.current / 1.6);
       if (deathStyle.current === "magic") {
-        modelRef.current.position.y = 0.05 + t * 0.4;
-        modelRef.current.rotation.x = t * 0.2;
+        // Magic: float up, spin, dissolve + brief bright emissive flash
+        // that fades as the body disappears.  The flash sells the
+        // "soul leaves the body" beat better than opacity alone.
+        const flash = Math.max(0, 1 - Math.abs(t - 0.2) * 3); // peak at t=0.2
+        modelRef.current.position.y = 0.05 + t * 0.8;
+        modelRef.current.rotation.x = t * 0.3;
+        modelRef.current.rotation.y = t * 1.5;
         modelRef.current.traverse((c: any) => {
           if (c.isMesh && c.material) {
             const mats = Array.isArray(c.material) ? c.material : [c.material];
-            mats.forEach((m: any) => { m.transparent = true; m.opacity = 1 - t; });
+            mats.forEach((m: any) => {
+              m.transparent = true;
+              m.opacity = 1 - t;
+              if (m.emissive) {
+                m.emissiveIntensity = (m.emissiveIntensity || 0) + flash * 2.0;
+              }
+            });
           }
         });
       } else if (deathStyle.current === "pierce") {
@@ -327,25 +339,47 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
         modelRef.current.position.y = -t * 0.1;
       }
     }
-    // Smooth the HP bar toward the current value (~0.3s ease).
+    // Smooth the HP bar toward the current value (~0.3s ease) and
+    // track the previous displayed value so we can draw a "ghost"
+    // red tick at the old HP position.  This makes HP loss much more
+    // visible than a smooth colour gradient alone.
+    const prevDisp = displayedHp.current;
     displayedHp.current = THREE.MathUtils.lerp(displayedHp.current, hpPct, Math.min(1, sd * 5));
     if (hpBarMesh.current) {
       const w = Math.max(0.01, 0.78 * displayedHp.current);
       hpBarMesh.current.scale.x = w / 0.78;
       hpBarMesh.current.position.x = -0.4 + (0.78 * displayedHp.current) / 2;
     }
+    if (hpGhostMesh.current) {
+      // The ghost bar is anchored at the *current* HP position and
+      // extends to the right toward where the bar used to be.  Its
+      // opacity decays so the visual reads as "you just lost this
+      // much HP".
+      const dx = prevDisp - displayedHp.current;
+      if (dx > 0.005) {
+        hpGhostMesh.current.visible = true;
+        hpGhostMesh.current.position.x = -0.4 + (0.78 * displayedHp.current) + (0.78 * dx) / 2;
+        hpGhostMesh.current.scale.x = dx;
+        const m = hpGhostMesh.current.material as THREE.MeshBasicMaterial;
+        m.opacity = Math.min(0.8, m.opacity + sd * 4);
+      } else {
+        // Decay the ghost so it fades out a moment after damage stops.
+        const m = hpGhostMesh.current.material as THREE.MeshBasicMaterial;
+        m.opacity = Math.max(0, m.opacity - sd * 1.5);
+        if (m.opacity < 0.01) hpGhostMesh.current.visible = false;
+      }
+    }
     if (modelRef.current) {
       // Idle breathing: every unit gets a per-uid phase so they don't
-      // all bob in sync.  Tiny amplitude (~3cm) is just enough to read
-      // as "alive" without distracting from combat.
+      // all bob in sync.  6cm is enough to read as "alive" without
+      // distracting from combat.  Selected units get a punchier
+      // selected-bob (15cm) in addition so they read as "ready to act".
       const phase = unit.uid.charCodeAt(unit.uid.length - 1) * 0.31;
-      const breath = (Math.sin(state.clock.elapsedTime * 1.5 + phase) * 0.5 + 0.5) * 0.03;
+      const breath = (Math.sin(state.clock.elapsedTime * 1.5 + phase) * 0.5 + 0.5) * 0.06;
       if (isSelected && !isMoving && !combatPhase && gs.selectionMode !== "moving") {
-        // Selected units get the punchier selected-bob in addition
-        // to their own breath so they read as "ready to act".
-        modelRef.current.position.y = breath + Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.08;
+        modelRef.current.position.y = breath + Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.15;
       } else {
-        modelRef.current.position.y = THREE.MathUtils.lerp(modelRef.current.position.y, breath, 0.15);
+        modelRef.current.position.y = THREE.MathUtils.lerp(modelRef.current.position.y, breath, 0.18);
       }
     }
     if (ringRef.current && (isSelected || hovered)) { const s = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.06; ringRef.current.scale.set(s, s, 1); }
@@ -390,7 +424,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
       {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 12, 12]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} /></mesh>}
       {isExhausted && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} /></mesh>}
       {unit.isBoss && <BossCrown />}
-      <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh ref={hpBarMesh} position={[-0.4 + (0.78*displayedHp.current)/2, 0, 0.001]}><planeGeometry args={[0.78, 0.06]} /><meshBasicMaterial color={hpColor} /></mesh></group>
+      <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh ref={hpBarMesh} position={[-0.4 + (0.78*displayedHp.current)/2, 0, 0.001]}><planeGeometry args={[0.78, 0.06]} /><meshBasicMaterial color={hpColor} /></mesh><mesh ref={hpGhostMesh} position={[-0.4 + (0.78*displayedHp.current)/2, 0, 0.002]}><planeGeometry args={[0.78, 0.06]} /><meshBasicMaterial color="#ff4040" transparent opacity={0} depthWrite={false} /></mesh></group>
       {selectionMode !== "moving" && <mesh position={[0, 0.7, 0]} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} onPointerDown={onPointerDown}><cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
     </group>
   );

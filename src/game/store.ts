@@ -73,6 +73,11 @@ interface GameState {
   activeDialogue: string | null;
   setDialogue: (id: string | null) => void;
   clearDialogue: () => void;
+  // Crit events: increment a counter so React components can show a
+  // brief screen flash on every crit hit.  Components use a per-mount
+  // key derived from this counter to remount + replay the animation.
+  critEvent: number;
+  triggerCritFlash: () => void;
   // Projectile queue: the combat flow pushes a spec when the swing
   // animation reaches "strike" and the renderer drains + spawns the
   // flight.  Same for slash trails on melee.
@@ -143,7 +148,7 @@ export const useGame = create<GameState>((set, get) => ({
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
-  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null, chapterIntro: null,
+  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null, chapterIntro: null, critEvent: 0,
   activeDialogue: null,
   convoy: [
     { id: "vulnerary", type: "item", uses: 3 },
@@ -263,7 +268,7 @@ export const useGame = create<GameState>((set, get) => ({
         get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
         get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
         get().triggerShake(r.crit ? 0.7 : 0.25);
-        if (r.crit) get().triggerSlowMo(0.25, 280);
+        if (r.crit) { get().triggerSlowMo(0.25, 280); get().triggerCritFlash(); }
       } else { get().addLog(t("logMiss", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang) }), "#888"); get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], 0, { isMiss: true }); }
       setP(pf + "impact", r.attacker.uid, r.defender.uid, ic); await sleep(150);
       setP(pf + "recoil", r.attacker.uid, r.defender.uid, ic); await sleep(350);
@@ -352,7 +357,7 @@ export const useGame = create<GameState>((set, get) => ({
             get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
             get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
             get().triggerShake(r.crit ? 0.7 : 0.25);
-            if (r.crit) get().triggerSlowMo(0.25, 280);
+            if (r.crit) { get().triggerSlowMo(0.25, 280); get().triggerCritFlash(); }
           } else { get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], 0, { isMiss: true }); }
           setP(pf + "impact", r.attacker.uid, r.defender.uid, ic); await sleep(150);
           setP(pf + "recoil", r.attacker.uid, r.defender.uid, ic); await sleep(350);
@@ -396,6 +401,7 @@ export const useGame = create<GameState>((set, get) => ({
   removeDamageNumber: (id) => set(s => ({ damageNumbers: s.damageNumbers.filter(n => n.id !== id) })),
   triggerShake: (amt) => set({ screenShake: amt }),
   triggerSlowMo: (scale, durationMs) => set({ timeScale: scale, slowMoUntil: performance.now() + durationMs }),
+  triggerCritFlash: () => set(s => ({ critEvent: s.critEvent + 1 })),
   triggerBossEntrance: (name, dur) => set({ bossEntrance: { name, born: performance.now() / 1000, dur } }),
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),

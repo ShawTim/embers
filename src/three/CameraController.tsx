@@ -8,6 +8,9 @@ type DragMode = "none" | "rotate" | "pan";
 export function CameraController({ w, h }: { w: number; h: number }) {
   const { camera, gl } = useThree();
   const shakeAmount = useRef(0), prevShake = useRef(0), combatZoom = useRef(0);
+  // Random phase for the radial-shake so successive shakes don't all
+  // kick in the same direction.
+  const shakePhase = useRef(0);
   const azimuth = useRef(0), elevation = useRef(0.85), distance = useRef(h * 1.1);
   const panX = useRef(0), panZ = useRef(0);
   // Soft follow: when a player unit is selected (and not in combat),
@@ -28,11 +31,10 @@ export function CameraController({ w, h }: { w: number; h: number }) {
   const DRAG_THRESHOLD = 12;
   const cx = (w - 1) / 2, cz = (h - 1) / 2;
 
-  useFrame(() => {
+  useFrame((state) => {
     const st = useGame.getState();
-    if (st.screenShake > 0 && st.screenShake !== prevShake.current) { shakeAmount.current = Math.max(shakeAmount.current, st.screenShake); prevShake.current = st.screenShake; }
-    if (shakeAmount.current > 0.01) shakeAmount.current *= 0.88; else shakeAmount.current = 0;
-
+    if (st.screenShake > 0 && st.screenShake !== prevShake.current) { shakeAmount.current = Math.max(shakeAmount.current, st.screenShake); prevShake.current = st.screenShake; shakePhase.current = Math.random() * Math.PI * 2; }
+    if (shakeAmount.current > 0.01) shakeAmount.current *= 0.94; else shakeAmount.current = 0;
     const tz = st.activeCombat ? 1 : 0; combatZoom.current = THREE.MathUtils.lerp(combatZoom.current, tz, 0.06);
     const z = combatZoom.current;
 
@@ -89,12 +91,14 @@ export function CameraController({ w, h }: { w: number; h: number }) {
     const camX = fx + Math.sin(azimuth.current + panAngle) * Math.cos(el) * dist + Math.cos(azimuth.current + panAngle) * panR;
     const camY = Math.sin(el) * dist;
     const camZ = fz + Math.cos(azimuth.current + panAngle) * Math.cos(el) * dist - Math.sin(azimuth.current + panAngle) * panR;
-    // Directional shake: shift camera target by a random vector scaled
-    // by shakeAmount.  Crit hits feel like a punch because the shake
-    // is brief but visible.
-    const sx = (Math.random() - 0.5) * shakeAmount.current;
-    const sy = (Math.random() - 0.5) * shakeAmount.current * 0.6;
-    const sz = (Math.random() - 0.5) * shakeAmount.current;
+    // Radial shake: a base kick direction + jitter around it.  This
+    // makes crit hits feel like a punch (consistent direction) rather
+    // than just static noise.
+    const p = shakePhase.current;
+    const k = shakeAmount.current;
+    const sx = (Math.cos(p) + (Math.random() - 0.5) * 0.6) * k * 0.5;
+    const sy = ((Math.random() - 0.5)) * k * 0.4;
+    const sz = (Math.sin(p) + (Math.random() - 0.5) * 0.6) * k * 0.5;
     camera.position.set(camX + sx, camY + sy, camZ + sz);
     camera.lookAt(fx, 0.5, fz);
   });

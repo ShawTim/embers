@@ -5,6 +5,7 @@ import { LandingScene } from "./three/LandingScene";
 import { HUD } from "./ui/HUD";
 import { DialogueBox } from "./ui/DialogueBox";
 import { BossEntrance } from "./ui/BossEntrance";
+import { CritFlash } from "./ui/CritFlash";
 import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
 import * as THREE from "three";
@@ -150,6 +151,7 @@ export default function App() {
       <HUD />
       <DialogueBox />
       <BossEntrance />
+      <CritFlash />
       {gamePhase === "victory" && (
         <div style={{ position: "absolute", inset: 0, zIndex: 250, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(20,60,20,0.3) 0%, rgba(0,0,0,0.6) 100%)" }} />
       )}
