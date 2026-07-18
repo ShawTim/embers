@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useGame } from "../game/store";
 import { TERRAIN, CHAPTERS } from "../data/gameData";
 import { t, chapterInfo, type StringKey } from "../i18n";
+import { themeForChapter } from "../game/actTheme";
 import { UnitPanel } from "./UnitPanel";
 import { ActionMenu } from "./ActionMenu";
 import { CombatPreview } from "./CombatPreview";
@@ -36,8 +37,16 @@ export function HUD() {
   const pm: Record<string, StringKey> = { player: "yourTurn", enemy: "enemyTurn", combat: "combat", victory: "victory", defeat: "defeat" };
   const pk = pm[phase] || "yourTurn";
   const pc = phase === "player" ? "player" : phase === "enemy" ? "enemy" : phase === "combat" ? "combat" : "";
+  const actTheme = chapter ? themeForChapter(chapter.id) : null;
   return (<>
-    <div className="hud-top">
+    <div
+      className="hud-top"
+      style={actTheme ? {
+        background: actTheme.topBar,
+        borderBottom: `1px solid ${actTheme.accent}55`,
+        boxShadow: `0 2px 12px ${actTheme.glow}`,
+      } : undefined}
+    >
       <div className="turn-badge">{tt("turn")} {turn}</div>
       <div className={`phase-badge ${pc}`}>{tt(pk)}</div>
       <div className="objective">{chapter ? chapterInfo(chapter.id, "obj", lang) : ""}</div>

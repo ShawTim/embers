@@ -108,12 +108,79 @@ const LAVA_VOLCANIC: EnvConfig = {
   fogColor: "#3a0a08",
 };
 
+// Per-act envmap variants.  Used as the base look for chapters that
+// don't have a more specific config (weather / time of day) defined.
+const ACT1_FOREST: EnvConfig = {
+  topColor: { r: 0.08, g: 0.16, b: 0.06 },
+  midColor: { r: 0.22, g: 0.32, b: 0.14 },
+  bottomColor: { r: 0.10, g: 0.14, b: 0.06 },
+  sunColor: { r: 1.6, g: 1.5, b: 1.0 },
+  sunSize: 0.025,
+  sunIntensity: 3.0,
+  horizonGlow: 0.35,
+  starCount: 80,
+  cloudFreq: 4,
+  cloudCoverage: 0.3,
+  cloudSharpness: 0.5,
+  fogColor: "#1c2818",
+};
+
+const ACT2_CITY: EnvConfig = {
+  topColor: { r: 0.04, g: 0.06, b: 0.12 },
+  midColor: { r: 0.10, g: 0.12, b: 0.20 },
+  bottomColor: { r: 0.06, g: 0.05, b: 0.04 },
+  sunColor: { r: 2.0, g: 1.6, b: 1.0 },
+  sunSize: 0.02,
+  sunIntensity: 2.5,
+  horizonGlow: 0.5,
+  starCount: 60,
+  cloudFreq: 5,
+  cloudCoverage: 0.4,
+  cloudSharpness: 0.5,
+  fogColor: "#10141e",
+};
+
+const ACT3_MOUNTAIN: EnvConfig = {
+  topColor: { r: 0.10, g: 0.12, b: 0.18 },
+  midColor: { r: 0.30, g: 0.34, b: 0.40 },
+  bottomColor: { r: 0.15, g: 0.16, b: 0.18 },
+  sunColor: { r: 1.4, g: 1.6, b: 2.0 },
+  sunSize: 0.025,
+  sunIntensity: 3.0,
+  horizonGlow: 0.4,
+  starCount: 150,
+  cloudFreq: 4,
+  cloudCoverage: 0.5,
+  cloudSharpness: 0.6,
+  fogColor: "#1a2030",
+};
+
+const ACT4_VOID: EnvConfig = {
+  topColor: { r: 0.12, g: 0.02, b: 0.04 },
+  midColor: { r: 0.28, g: 0.06, b: 0.08 },
+  bottomColor: { r: 0.15, g: 0.02, b: 0.04 },
+  sunColor: { r: 2.5, g: 0.6, b: 0.4 },
+  sunSize: 0.05,
+  sunIntensity: 4.0,
+  horizonGlow: 0.8,
+  starCount: 100,
+  cloudFreq: 5,
+  cloudCoverage: 0.6,
+  cloudSharpness: 0.5,
+  fogColor: "#2a0a0c",
+};
+
 export function envForChapter(chapterId: string): EnvConfig {
   const id = chapterId.toLowerCase();
+  // Specific weather / scene configs win over the act base.
   if (id.includes("dungeon") || id.includes("crypt") || id.includes("cave") || id.includes("tom")) return DUNGEON_TORCH;
   if (id.includes("ice") || id.includes("frozen") || id.includes("mount")) return ICE_FROZEN;
   if (id.includes("volcano") || id.includes("lava") || id.includes("inferno")) return LAVA_VOLCANIC;
-  if (id === "ch01" || id === "ch02" || id === "ch03" || id === "ch04" || id === "ch05") return DEFAULT_CH1_NIGHT;
+  if (id === "ch01" || id === "ch02") return DEFAULT_CH1_NIGHT;
+  if (id === "ch03" || id === "ch04" || id === "ch05") return ACT1_FOREST;
+  if (id === "ch06" || id === "ch07" || id === "ch08" || id === "ch09" || id === "ch10") return ACT2_CITY;
+  if (id === "ch11" || id === "ch13" || id === "ch15") return ACT3_MOUNTAIN;
+  if (id === "ch16" || id === "ch17" || id === "ch18" || id === "ch19" || id === "ch20") return ACT4_VOID;
   return DAY_DAWN;
 }
 

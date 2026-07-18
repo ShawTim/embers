@@ -34,6 +34,7 @@ const STRINGS = {
   saveSlot4: { en: "Slot 4", zh: "檔案 4" },
   saveSlot5: { en: "Slot 5", zh: "檔案 5" },
   saveOnlyPlayerTurn: { en: "You can only save on your turn.", zh: "只能在你的回合儲存。" },
+  prologue: { en: "Prologue", zh: "序章" },
   f_player: { en: "ALLY", zh: "我方" },
   f_enemy: { en: "ENEMY", zh: "敵方" },
   f_ally: { en: "FRIEND", zh: "友軍" },

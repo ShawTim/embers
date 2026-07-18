@@ -6,10 +6,12 @@ import { HUD } from "./ui/HUD";
 import { DialogueBox } from "./ui/DialogueBox";
 import { BossEntrance } from "./ui/BossEntrance";
 import { CritFlash } from "./ui/CritFlash";
+import { ChapterIntroCard } from "./ui/ChapterIntroCard";
 import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
 import { audio } from "./audio/engine";
 import { save as saveSystem } from "./game/save";
+import { themeForChapter } from "./game/actTheme";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -49,6 +51,7 @@ export default function App() {
   const initChapter = useGame(s => s.initChapter);
   const grid = useGame(s => s.grid);
   const gamePhase = useGame(s => s.phase);
+  const chapter = useGame(s => s.chapter);
   const lang = useGame(s => s.lang);
   const tt = (k: Parameters<typeof t>[0]) => t(k, lang);
   const loaderRef = useRef(new GLTFLoader());
@@ -112,7 +115,14 @@ export default function App() {
   useEffect(() => {
     if (phase !== "game") return;
     if (gamePhase === "player") {
-      audio.startMusic("battle");
+      // Vary the battle music by act so the player gets a distinct feel
+      // for each arc.
+      const actTrack: Record<string, string> = {
+        prologue: "battle", act1: "battle", act2: "battle",
+        act3: "battle", act4: "battle",
+      };
+      const actId = chapter ? themeForChapter(chapter.id).id : "prologue";
+      audio.startMusic(actTrack[actId] || "battle");
     } else if (gamePhase === "enemy") {
       // keep battle music going; boss transitions handled in store
     } else if (gamePhase === "victory") {
@@ -177,6 +187,7 @@ export default function App() {
       <DialogueBox />
       <BossEntrance />
       <CritFlash />
+      {chapter?.id && <ChapterIntroCard chapterId={chapter.id} />}
       {gamePhase === "victory" && (
         <div style={{ position: "absolute", inset: 0, zIndex: 250, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(20,60,20,0.3) 0%, rgba(0,0,0,0.6) 100%)" }} />
       )}
