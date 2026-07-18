@@ -8,6 +8,7 @@ import { BossEntrance } from "./ui/BossEntrance";
 import { CritFlash } from "./ui/CritFlash";
 import { LangToggle } from "./ui/LangToggle";
 import { t } from "./i18n";
+import { audio } from "./audio/engine";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
@@ -106,6 +107,22 @@ export default function App() {
     if (phase === "game" && !grid) initChapter(0);
   }, [phase, grid, initChapter]);
 
+  // Music + SFX for phase transitions
+  useEffect(() => {
+    if (phase !== "game") return;
+    if (gamePhase === "player") {
+      audio.startMusic("battle");
+    } else if (gamePhase === "enemy") {
+      // keep battle music going; boss transitions handled in store
+    } else if (gamePhase === "victory") {
+      audio.play("victory");
+      audio.startMusic("victory");
+    } else if (gamePhase === "defeat") {
+      audio.play("defeat");
+      audio.startMusic("defeat");
+    }
+  }, [phase, gamePhase]);
+
   if (phase === "loading") {
     return (
       <div className="loading-screen">
@@ -138,7 +155,7 @@ export default function App() {
               {tt("mouseWheel")}<br /><br />
               <span style={{ color: "#7af" }}>{tt("blueHint")}</span>
             </div>
-            <button onClick={() => setPhase("game")}>{tt("startGame")}</button>
+            <button onClick={() => { audio.unlock(); audio.play("menu"); audio.startMusic("title"); setPhase("game"); }}>{tt("startGame")}</button>
           </div>
         </div>
       </>

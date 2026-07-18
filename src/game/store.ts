@@ -8,6 +8,25 @@ import { CHAPTERS } from "../data/gameData";
 import type { Lang } from "../i18n";
 import { t, unitName, chapterInfo } from "../i18n";
 import { getDialogueForTrigger } from "../data/dialogues";
+import { audio } from "../audio/engine";
+import type { WeaponType } from "../types";
+
+function weaponSfxName(w: WeaponType | undefined): string | null {
+  if (!w) return "hit_sword";
+  switch (w) {
+    case "sword": return "hit_sword";
+    case "axe": return "hit_axe";
+    case "lance": return "hit_lance";
+    case "bow": return "hit_lance";
+    case "fire": return "fire";
+    case "thunder": return "lightning";
+    case "wind": return "move";
+    case "light": return "crit";
+    case "dark": return "dark";
+    case "staff": return "heal";
+    default: return "hit_sword";
+  }
+}
 
 export type Phase = "player" | "enemy" | "combat" | "victory" | "defeat";
 export type SelectionMode = "idle" | "moving" | "actionMenu" | "targeting" | "enemyInfo";
@@ -206,6 +225,7 @@ export const useGame = create<GameState>((set, get) => ({
     const w = u.equippedWeapon; let at: string[] = [];
     if (w) at = g.computeAttackRange(u.pos, w.minRange, w.maxRange).map(p => posKey(p));
     set({ selectedUnit: u, moveRange: mr, attackRange: at, selectionMode: "moving", hoveredUnit: u });
+    audio.play("select");
   },
 
   deselectUnit: () => set({ selectedUnit: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null }),
@@ -238,6 +258,7 @@ export const useGame = create<GameState>((set, get) => ({
 
   confirmMove: (p) => {
     set({ pendingMove: p, selectionMode: "actionMenu" });
+    audio.play("move");
     // Seize check: if a player unit is already standing on the seize
     // tile (e.g. they just moved there via confirmMove), victory fires
     // immediately.  In practice the player will usually need to take
@@ -262,6 +283,11 @@ export const useGame = create<GameState>((set, get) => ({
       // Fire the per-weapon VFX on the strike frame so it lines up
       // with the visible weapon swing / cast animation.
       queueProjectileForAttack(set, get, r.attacker, r.defender);
+      // SFX: per-weapon hit + crit sting
+      const wpnType = r.attacker.equippedWeapon?.type;
+      const sfx = weaponSfxName(wpnType);
+      if (sfx) audio.play(sfx);
+      if (r.crit) audio.play("crit");
       await sleep(200);
       if (r.hit) {
         get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ffffff");
@@ -275,11 +301,11 @@ export const useGame = create<GameState>((set, get) => ({
       setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
     }
     setP("exit", "", ""); await sleep(300);
-    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = atk.equippedWeapon?.type; }
-    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); atk._lastKilledByWeapon = target.equippedWeapon?.type; }
+    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = atk.equippedWeapon?.type; audio.play("death"); }
+    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); atk._lastKilledByWeapon = target.equippedWeapon?.type; audio.play("death"); }
     if (!atk.isDead) {
       atk.exp += calculateExp(atk, target, target.isDead);
-      const { leveledUp, newLevel } = maybeLevelUp(atk);
+      const { leveledUp, newLevel } = maybeLevelUp(atk, (lv) => audio.play("level_up"));
       if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(atk.def.id, get().lang), n: newLevel }), "#ffe070");
     }
     atk.hasActed = true;
@@ -300,7 +326,7 @@ export const useGame = create<GameState>((set, get) => ({
     const healAmt = (healer.equippedWeapon?.might || 10) + healer.stats.mag;
     const actual = Math.min(healAmt, target.maxHp - target.hp);
     target.hp += actual; healer.exp += 20;
-    const { leveledUp, newLevel } = maybeLevelUp(healer);
+    const { leveledUp, newLevel } = maybeLevelUp(healer, (lv) => audio.play("level_up"));
     if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(healer.def.id, get().lang), n: newLevel }), "#ffe070");
     healer.hasActed = true;
     get().addLog(t("logHeal", get().lang, { healer: unitName(healer.def.id, get().lang), target: unitName(target.def.id, get().lang), n: actual }), "#3aff3a");
@@ -328,6 +354,8 @@ export const useGame = create<GameState>((set, get) => ({
       get().triggerBossEntrance(unitName(boss.def.id, get().lang), 1.2);
       get().triggerShake(0.8);
       get().triggerSlowMo(0.4, 500);
+      audio.startMusic("boss");
+      audio.play("boss_intro");
       set({ _bossIntroDone: true } as any);
       await sleep(900);
     }
@@ -364,17 +392,18 @@ export const useGame = create<GameState>((set, get) => ({
           setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
         }
         setP("exit", "", ""); await sleep(300);
-        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = u.equippedWeapon?.type; }
-        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); u._lastKilledByWeapon = target.equippedWeapon?.type; }
-        if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u); }
+        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = u.equippedWeapon?.type; audio.play("death"); }
+        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); u._lastKilledByWeapon = target.equippedWeapon?.type; audio.play("death"); }
+        if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u, (lv) => audio.play("level_up")); }
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
         const healAmt = u.equippedWeapon?.might || 10; const actual = Math.min(healAmt, dec.healTarget.maxHp - dec.healTarget.hp);
         dec.healTarget.hp += actual;
-        u.exp += 20; maybeLevelUp(u);
+        u.exp += 20; maybeLevelUp(u, (lv) => audio.play("level_up"));
         get().addLog(t("logHeal", get().lang, { healer: unitName(u.def.id, get().lang), target: unitName(dec.healTarget.def.id, get().lang), n: actual }), "#3aff8a");
         get().addDamageNumber([dec.healTarget.pos.x, 1.5, dec.healTarget.pos.y], actual, { isHeal: true });
         get().addHealAura([dec.healTarget.pos.x, 0.22, dec.healTarget.pos.y]);
+        audio.play("heal");
         set({ units: [...g.getAllUnits()] }); await sleep(300);
       }
     }

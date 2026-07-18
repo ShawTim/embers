@@ -3,6 +3,7 @@ import { useGame } from "../game/store";
 import { getDialogue, type DialogueLine } from "../data/dialogues";
 import { unitName, t } from "../i18n";
 import { Portrait3D } from "./Portrait3D";
+import { audio } from "../audio/engine";
 import { MODEL_PATHS } from "../three/Unit3D";
 
 // Map unit def.id to modelId for portraits
@@ -46,6 +47,8 @@ export function DialogueBox() {
       if (i < fullText.length) {
         setDisplayedText(fullText.slice(0, i + 1));
         i++;
+        // Soft tick every 3 chars to avoid buzzing
+        if (i % 3 === 0) audio.play("dialogue_tick");
       } else {
         setIsTyping(false);
         if (typewriterRef.current) clearInterval(typewriterRef.current);

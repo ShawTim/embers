@@ -3,7 +3,7 @@ import { CLASSES, WEAPONS, ITEMS, UNITS, PROMOTIONS } from "./gameData";
 
 const EXP_PER_LEVEL = 100;
 
-export function maybeLevelUp(unit: RuntimeUnit): { leveledUp: boolean; newLevel: number } {
+export function maybeLevelUp(unit: RuntimeUnit, onLevelUp?: (newLevel: number) => void): { leveledUp: boolean; newLevel: number } {
   let levelsGained = 0;
   while (unit.exp >= EXP_PER_LEVEL && unit.level < 20) {
     unit.exp -= EXP_PER_LEVEL;
@@ -27,6 +27,7 @@ export function maybeLevelUp(unit: RuntimeUnit): { leveledUp: boolean; newLevel:
       unit.hp += diff;
     }
   }
+  if (levelsGained > 0 && onLevelUp) onLevelUp(unit.level);
   return { leveledUp: levelsGained > 0, newLevel: unit.level };
 }
 

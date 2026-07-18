@@ -6,6 +6,7 @@ import { ActionMenu } from "./ActionMenu";
 import { CombatPreview } from "./CombatPreview";
 import { LangToggle } from "./LangToggle";
 import { UnitList } from "./UnitList";
+import { SoundToggle } from "./SoundToggle";
 
 export function HUD() {
   const turn = useGame(s => s.turn);
@@ -39,6 +40,7 @@ export function HUD() {
       <div className="objective">{chapter ? chapterInfo(chapter.id, "obj", lang) : ""}</div>
       <div className="unit-counts">{playerReady}/{playerTotal} {tt("ready")} · {enemyAlive} {tt("enemies")}</div>
       <LangToggle />
+      <SoundToggle />
       {phase === "player" && lastAction && playerReady > 0 && (
         <button className="btn-repeat-last" onClick={repeatLastAction} title="Repeat last attack/heal on the same target">{tt("repeatLast")}</button>
       )}

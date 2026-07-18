@@ -381,3 +381,48 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
   20%  { opacity: 0.7; }
   100% { opacity: 0; }
 }
+
+/* Sound toggle: small speaker icon in the HUD top bar with popover panel */
+.sound-toggle-wrap {
+  position: relative;
+  pointer-events: auto;
+}
+.btn-sound {
+  background: rgba(20, 30, 50, 0.55);
+  border: 1px solid rgba(120, 160, 220, 0.4);
+  border-radius: 6px;
+  color: #d0e0ff;
+  font-size: 18px;
+  line-height: 1;
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  min-width: 32px;
+  min-height: 32px;
+}
+.btn-sound:hover { background: rgba(50, 80, 130, 0.7); }
+.sound-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: rgba(15, 22, 38, 0.95);
+  border: 1px solid rgba(120, 160, 220, 0.5);
+  border-radius: 6px;
+  padding: 10px 12px;
+  min-width: 180px;
+  z-index: 700;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+.sound-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  color: #c0d0e8;
+  font-size: 12px;
+}
+.sound-row input[type="range"] { flex: 1; }
+.sound-mute { cursor: pointer; }
+.sound-mute input { margin: 0; }
