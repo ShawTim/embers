@@ -300,6 +300,14 @@ export const ch12_victory: DialogueScript = {
   ],
 };
 
+export const ch12_boss_death: DialogueScript = {
+  id: "ch12_boss_death",
+  lines: [
+    { speaker: "umbral_dragon", text: { en: "Rrrrr... the light... it burns... yet the shadow... loosens...", zh: "嗚嗚……光……灼熱……然而暗影……鬆開了……" }, mood: "sad" },
+    { speaker: "lyra", text: { en: "Rest now, ancient one. The corruption is gone. Sleep.", zh: "現在安息吧，古老者。腐化消失了。安睡。" }, mood: "neutral" },
+  ],
+};
+
 export const ch13_pre: DialogueScript = {
   id: "ch13_pre",
   lines: [
@@ -492,7 +500,7 @@ export const DIALOGUES: Record<string, DialogueScript> = {
   ch09_pre, ch09_victory,
   ch10_pre, ch10_boss_death, ch10_victory,
   ch11_pre, ch11_victory,
-  ch12_pre, ch12_victory,
+  ch12_pre, ch12_boss_death, ch12_victory,
   ch13_pre, ch13_victory,
   ch14_pre, ch14_victory,
   ch15_pre, ch15_boss_death, ch15_victory,

@@ -1,5 +1,5 @@
 import { useGame } from "../game/store";
-import { TERRAIN } from "../data/gameData";
+import { TERRAIN, CHAPTERS } from "../data/gameData";
 import { t, chapterInfo, type StringKey } from "../i18n";
 import { UnitPanel } from "./UnitPanel";
 import { ActionMenu } from "./ActionMenu";
@@ -43,7 +43,7 @@ export function HUD() {
     <div className="hud-bottom-right"><UnitPanel unit={displayUnit ?? null} /></div>
     <ActionMenu /><CombatPreview /><UnitList />
     <div className="combat-log">{combatLog.slice(-4).map((l, i) => <div key={i} className="log-line" style={{ color: l.color }}>{l.text}</div>)}</div>
-    {message && (phase === "victory" || phase === "defeat") && (<div className="big-message" style={{ color: phase === "victory" ? "#5fa84a" : "#e8484a" }}>{message}{phase === "victory" && <div style={{ fontSize: 16, marginTop: 20, pointerEvents: "auto" }}><button style={{ padding: "10px 28px", fontSize: 14, cursor: "pointer", background: "linear-gradient(180deg, #2a4a7a, #1a3050)", color: "#fff", border: "1px solid #4a7aaa", borderRadius: 6 }} onClick={() => { const ch = useGame.getState().chapter; useGame.getState().initChapter(ch?.id === "ch01" ? 1 : 0); }}>{useGame.getState().chapter?.id === "ch01" ? tt("nextChapter") : tt("playAgain")}</button></div>}</div>)}
+    {message && (phase === "victory" || phase === "defeat") && (<div className="big-message" style={{ color: phase === "victory" ? "#5fa84a" : "#e8484a" }}>{message}{phase === "victory" && (() => { const ch = useGame.getState().chapter; const idx = ch ? CHAPTERS.findIndex(c => c.id === ch.id) : -1; const isLast = idx === CHAPTERS.length - 1; return <div style={{ fontSize: 16, marginTop: 20, pointerEvents: "auto" }}><button style={{ padding: "10px 28px", fontSize: 14, cursor: "pointer", background: "linear-gradient(180deg, #2a4a7a, #1a3050)", color: "#fff", border: "1px solid #4a7aaa", borderRadius: 6 }} onClick={() => { useGame.getState().initChapter(isLast ? 0 : idx + 1); }}>{isLast ? tt("playAgain") : tt("nextChapter")}</button></div>; })()}</div>)}
     {phase === "player" && <TutorialHint mode={selectionMode} ready={playerReady} lang={lang} />}
   </>);
 }

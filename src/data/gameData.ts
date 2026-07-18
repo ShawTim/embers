@@ -143,6 +143,7 @@ export const UNITS: Record<string, UnitDef> = {
   umbral_horror: { id: "umbral_horror", name: "Umbral Horror", desc: "A creature of pure darkness, summoned from the Umbral realm. Mindless and destructive.", classId: "fighter", level: 10, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Minion", portraitColor: "#0a0a1a" },
   void_wraith: { id: "void_wraith", name: "Void Wraith", desc: "An ethereal being from beyond the Void Gate. Its touch drains the light itself.", classId: "mage", level: 12, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#1a0a2a" },
   zethar: { id: "zethar", name: "Lord Zethar", desc: "The Endless Night. The first Guardian of the Ember Throne, who turned against the flame when he discovered its terrible truth.", classId: "lord", level: 20, faction: "enemy", isBoss: true, growthBonus: { hp: 40, str: 25, mag: 20, skl: 20, spd: 15, def: 25, res: 25 }, inventory: ["silver_sword"], modelId: "Vampire", portraitColor: "#000010" },
+  umbral_dragon: { id: "umbral_dragon", name: "Umbral Dragon", desc: "An ancient wyrm corrupted by the shadow that festers in the mountains. Its breath unmakes the light.", classId: "knight", level: 10, faction: "enemy", isBoss: true, growthBonus: { hp: 60, str: 25, def: 20, res: 25 }, inventory: ["fire"], modelId: "Monstrosity", portraitColor: "#3a0a3a" },
 };
 
 export const CHAPTERS: ChapterDef[] = [
@@ -203,6 +204,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch05", name: "Gates of Valdris", desc: "Break through to the capital", objective: "Reach the Throne Hall",
     objectiveType: "seize", mapSize: { w: 20, h: 10 },
     terrain: { "4,0":"wall","4,1":"wall","4,2":"wall","4,3":"wall","4,6":"wall","4,7":"wall","4,8":"wall","4,9":"wall","15,0":"wall","15,1":"wall","15,2":"wall","15,3":"wall","15,6":"wall","15,7":"wall","15,8":"wall","15,9":"wall" },
+    seizeTile: { x: 18, y: 5 },
     deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:2,y:4},{x:2,y:6},{x:3,y:5},{x:3,y:6}],
     enemies: [
       {unitId:"cultist",pos:{x:7,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:5},aiType:"aggressive"},
@@ -229,6 +231,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch07", name: "The Undercity", desc: "Find the cult temple in the sewers", objective: "Reach the temple",
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
     terrain: { "0,0":"wall","17,0":"wall","0,9":"wall","17,9":"wall" },
+    seizeTile: { x: 16, y: 4 },
     deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5},{x:4,y:4}],
     enemies: [
       {unitId:"cultist",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:5,y:7},aiType:"aggressive"},
@@ -279,6 +282,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch11", name: "Into the Mountains", desc: "Cross the Frostpeak pass", objective: "Reach the far side",
     objectiveType: "seize", mapSize: { w: 20, h: 10 },
     terrain: { "0,0":"wall","19,0":"wall","0,9":"wall","19,9":"wall","5,2":"mountain","6,2":"mountain","5,3":"mountain","6,3":"mountain","5,7":"mountain","6,7":"mountain","5,8":"mountain","6,8":"mountain","10,4":"mountain","11,4":"mountain","10,5":"mountain","11,5":"mountain","10,6":"mountain","11,6":"mountain" },
+    seizeTile: { x: 18, y: 5 },
     deploymentPoints: [{x:1,y:1},{x:1,y:4},{x:1,y:7},{x:2,y:4},{x:3,y:2},{x:3,y:7}],
     enemies: [
       {unitId:"cultist",pos:{x:8,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:8,y:5},aiType:"aggressive"},
@@ -295,6 +299,8 @@ export const CHAPTERS: ChapterDef[] = [
       {unitId:"umbral_horror",pos:{x:8,y:3},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:8,y:8},aiType:"aggressive"},
       {unitId:"umbral_horror",pos:{x:9,y:5},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:9,y:6},aiType:"aggressive"},
       {unitId:"void_wraith",pos:{x:7,y:4},aiType:"aggressive"},{unitId:"void_wraith",pos:{x:7,y:7},aiType:"aggressive"},
+      {unitId:"umbral_dragon",pos:{x:13,y:5},aiType:"boss",isBoss:true},
+      {unitId:"void_wraith",pos:{x:13,y:6},aiType:"defensive"},{unitId:"void_wraith",pos:{x:14,y:5},aiType:"defensive"},
     ],
   },
   {
@@ -313,6 +319,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch14", name: "The Frozen Lake", desc: "Cross the ice without falling", objective: "Reach the far shore",
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
     terrain: {}, // All default (water would be here, but simplified)
+    seizeTile: { x: 16, y: 5 },
     deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:2,y:5}],
     enemies: [
       {unitId:"cultist",pos:{x:7,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:7},aiType:"aggressive"},
@@ -340,6 +347,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch16", name: "The Void Gate", desc: "Close the portal", objective: "Reach the gate",
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
     terrain: { "0,0":"wall","17,0":"wall","0,9":"wall","17,9":"wall" },
+    seizeTile: { x: 15, y: 5 },
     deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:6,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:6,y:7},aiType:"aggressive"},
@@ -353,6 +361,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch17", name: "Echoes of the Past", desc: "Remember the sacrifice", objective: "Reach the old throne",
     objectiveType: "seize", mapSize: { w: 16, h: 10 },
     terrain: { "0,0":"wall","15,0":"wall","0,9":"wall","15,9":"wall","7,4":"fort","8,4":"fort","7,5":"fort","8,5":"fort" },
+    seizeTile: { x: 7, y: 4 },
     deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:2,y:4},{x:2,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:5,y:7},aiType:"aggressive"},

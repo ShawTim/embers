@@ -218,7 +218,15 @@ export const useGame = create<GameState>((set, get) => ({
     }
   },
 
-  confirmMove: (p) => set({ pendingMove: p, selectionMode: "actionMenu" }),
+  confirmMove: (p) => {
+    set({ pendingMove: p, selectionMode: "actionMenu" });
+    // Seize check: if a player unit is already standing on the seize
+    // tile (e.g. they just moved there via confirmMove), victory fires
+    // immediately.  In practice the player will usually need to take
+    // another action after moving, but we let them seize the moment
+    // they are on the tile to keep the chapter ending snappy.
+    checkBattleEnd(set, get);
+  },
   cancelMove: () => set({ pendingMove: null, selectionMode: "moving" }),
 
   attackTarget: async (target) => {
@@ -265,6 +273,7 @@ export const useGame = create<GameState>((set, get) => ({
     const st = get(); if (!st.selectedUnit || !st.grid || !st.pendingMove) return;
     const u = st.selectedUnit; st.grid.moveUnit(u, st.pendingMove); u.hasActed = true;
     set({ selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", units: [...st.grid.getAllUnits()] });
+    checkBattleEnd(set, get);
   },
 
   healTarget: (target) => {
@@ -280,6 +289,7 @@ export const useGame = create<GameState>((set, get) => ({
     get().addDamageNumber([target.pos.x, 1.5, target.pos.y], actual, { isHeal: true });
     get().addHealAura([target.pos.x, 0.22, target.pos.y]);
     set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()] });
+    checkBattleEnd(set, get);
   },
 
   endPlayerTurn: () => {
@@ -423,12 +433,34 @@ function checkBattleEnd(set: any, get: any) {
     set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
   }
   else if (ch.objectiveType === "boss") {
-    const boss = s.units.find((u: RuntimeUnit) => u.isBoss);
-    if (boss?.isDead) {
+    // Look up the boss from the grid (which keeps dead bosses removed) AND
+    // from any dead-unit reference — but since `g.removeUnit` removes the
+    // unit from the grid entirely, we need to track dead bosses separately.
+    // Simpler: check the live enemy list for any boss still alive; if no
+    // boss is alive at all (i.e. the boss was killed and removed), win.
+    const liveBoss = s.units.find((u: RuntimeUnit) => u.isBoss && !u.isDead);
+    if (!liveBoss) {
       const bd = getDialogueForTrigger(ch.id, "boss_death");
       const vd = getDialogueForTrigger(ch.id, "victory");
       // Show boss death dialogue first if exists
       if (bd && !s.activeDialogue) { set({ activeDialogue: bd }); return; }
+      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+    }
+  }
+  else if (ch.objectiveType === "defend") {
+    // Win when the turn counter has reached the survival target.
+    const need = ch.objectiveTurns ?? 99;
+    if (s.turn >= need) {
+      const vd = getDialogueForTrigger(ch.id, "victory");
+      set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+    }
+  }
+  else if (ch.objectiveType === "seize" && ch.seizeTile) {
+    // Win when any living player unit is standing on the seize tile.
+    const t = ch.seizeTile;
+    const onTile = players.some((u: RuntimeUnit) => u.pos.x === t.x && u.pos.y === t.y);
+    if (onTile) {
+      const vd = getDialogueForTrigger(ch.id, "victory");
       set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
     }
   }

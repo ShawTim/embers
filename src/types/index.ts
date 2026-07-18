@@ -103,6 +103,8 @@ export interface ChapterDef {
   mapSize: { w: number; h: number };
   terrain: Record<string, TerrainType>;
   deploymentPoints: { x: number; y: number }[];
+  /** For objectiveType "seize": a player unit must stand on this tile to win. */
+  seizeTile?: { x: number; y: number };
   enemies: Array<{
     unitId: string;
     pos: { x: number; y: number };
