@@ -104,7 +104,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const targetRotY = useRef(0);
   const curRotY = useRef(0);
   const prevHp = useRef(unit.hp);
-  const deathStyle = useRef<"melee" | "magic">("melee");
+  const deathStyle = useRef<"melee" | "magic" | "pierce">("melee");
   const deathAge = useRef(0);
   // Shared swing state (weapon mesh + manual lean override). The
   // attack animation (attackSlash) sets leanX/leanZ; the useFrame
@@ -236,16 +236,23 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   useEffect(() => { if (isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idleB || ANIM.idle, true, 0.2); else if (!isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idle, true, 0.3); }, [isSelected]);
   useEffect(() => { if (unit.hp < prevHp.current) { setFlashRed(true); const tm = setTimeout(() => setFlashRed(false), 120); prevHp.current = unit.hp; return () => clearTimeout(tm); } prevHp.current = unit.hp; }, [unit.hp]);
   useEffect(() => { if (unit.isDead && !dead) {
-    // Pick a death style from the attacker's weapon so melee kills
-    // tumble back, magic kills dissolve in a purple glow.
+    // Death style: pierce (lance/bow) → lean back with a stuck weapon;
+    // magic → float up + dissolve; else → melee tumble.
     const w = unit._lastKilledByWeapon;
-    const style: "melee" | "magic" = w && (w === "fire" || w === "light" || w === "dark") ? "magic" : "melee";
+    const style: "melee" | "magic" | "pierce" =
+      w === "lance" || w === "bow" ? "pierce"
+      : w && (w === "fire" || w === "light" || w === "dark") ? "magic"
+      : "melee";
     deathStyle.current = style;
     playAnim(ANIM.deathA, false, 0.2);
     if (style === "magic") {
-      // Magic kills get a shorter death so the model disappears
-      // before the dissolve shader has a chance to mis-render.
       const tm = setTimeout(() => setDead(true), 1400);
+      return () => clearTimeout(tm);
+    }
+    if (style === "pierce") {
+      // Pierce: model stays upright briefly, then slumps — slightly
+      // longer total so the impalement reads clearly.
+      const tm = setTimeout(() => setDead(true), 1800);
       return () => clearTimeout(tm);
     }
     const tm = setTimeout(() => setDead(true), 2000);
@@ -302,6 +309,18 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
             mats.forEach((m: any) => { m.transparent = true; m.opacity = 1 - t; });
           }
         });
+      } else if (deathStyle.current === "pierce") {
+        // Pierce — model stays upright, then slumps forward and slightly
+        // to one side as if a lance/arrow is stuck in it.
+        if (t < 0.4) {
+          // Brief stagger before the slump
+          modelRef.current.rotation.x = -t * 0.15;
+        } else {
+          const t2 = (t - 0.4) / 0.6;
+          modelRef.current.rotation.x = -0.06 - t2 * 0.6;
+          modelRef.current.rotation.z = t2 * 0.3;
+          modelRef.current.position.y = -t2 * 0.08;
+        }
       } else {
         // Melee — collapse backward (away from the camera) over 1.2s.
         modelRef.current.rotation.x = -t * Math.PI / 2;
@@ -382,26 +401,46 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
 // crown reads as a glowing point of light, not a dark cone.
 function BossCrown() {
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
+  const crackRef = useRef<THREE.Mesh>(null);
   useEffect(() => {
     if (matRef.current) (matRef.current as any).__bloom = true;
   }, []);
+  useFrame((state) => {
+    if (crackRef.current) {
+      // Slow rotation + breathing scale on the ground crack ring so it
+      // reads as a "this is dangerous" aura rather than a static decal.
+      crackRef.current.rotation.z = state.clock.elapsedTime * 0.3;
+      const s = 1 + Math.sin(state.clock.elapsedTime * 1.5) * 0.04;
+      crackRef.current.scale.setScalar(s);
+    }
+  });
   return (
-    <group position={[0, TARGET_HEIGHT + 0.3, 0]}>
-      <mesh>
-        <coneGeometry args={[0.18, 0.28, 6]} />
-        <meshStandardMaterial
-          ref={matRef}
-          color="#ffd060"
-          metalness={0.9}
-          roughness={0.2}
-          emissive="#ffaa22"
-          emissiveIntensity={1.4}
-        />
+    <>
+      <group position={[0, TARGET_HEIGHT + 0.3, 0]}>
+        <mesh>
+          <coneGeometry args={[0.18, 0.28, 6]} />
+          <meshStandardMaterial
+            ref={matRef}
+            color="#ffd060"
+            metalness={0.9}
+            roughness={0.2}
+            emissive="#ffaa22"
+            emissiveIntensity={1.4}
+          />
+        </mesh>
+        <mesh position={[0, 0.22, 0]}>
+          <sphereGeometry args={[0.18, 12, 8]} />
+          <meshBasicMaterial color="#ffd060" transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+      </group>
+      <mesh ref={crackRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+        <ringGeometry args={[0.4, 0.55, 32]} />
+        <meshBasicMaterial color="#ffaa22" transparent opacity={0.4} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-      <mesh position={[0, 0.22, 0]}>
-        <sphereGeometry args={[0.18, 12, 8]} />
-        <meshBasicMaterial color="#ffd060" transparent opacity={0.45} depthWrite={false} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.045, 0]}>
+        <ringGeometry args={[0.55, 0.62, 6]} />
+        <meshBasicMaterial color="#ff8030" transparent opacity={0.25} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
-    </group>
+    </>
   );
 }

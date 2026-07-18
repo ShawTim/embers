@@ -332,3 +332,37 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
   color: #fff;
   letter-spacing: 0.05em;
 }
+
+/* Mobile-friendly touch targets: minimum 44x44 per Apple HIG */
+@media (max-width: 768px), (pointer: coarse) {
+  .hud-top .btn-end-turn,
+  .hud-top .btn-repeat-last {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 22px;
+    font-size: 14px;
+  }
+  .btn-unit-list {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+  .btn-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tutorial-hint {
+    font-size: 14px;
+    padding: 10px 14px;
+  }
+  .action-menu button {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  .dialogue-overlay {
+    padding: 16px;
+  }
+  .dialogue-box {
+    padding: 18px 22px;
+  }
+}

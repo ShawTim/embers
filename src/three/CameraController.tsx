@@ -20,6 +20,9 @@ export function CameraController({ w, h }: { w: number; h: number }) {
   // guy" beat.  Decays back to normal over ~1.5s.
   const bossCam = useRef(0);
   const bossCamUntil = useRef(0);
+  // Chapter intro pan: when a chapter is loaded, sweep the camera
+  // target across the map then settle to centre.  Decays to 0 over 1.5s.
+  const chapterPan = useRef(0);
   const dragMode = useRef<DragMode>("none"), lastPointer = useRef({ x: 0, y: 0 });
   const potentialDrag = useRef<{ x: number; y: number; button: number; shift: boolean } | null>(null);
   const DRAG_THRESHOLD = 12;
@@ -41,6 +44,16 @@ export function CameraController({ w, h }: { w: number; h: number }) {
     } else if (now >= bossCamUntil.current) {
       bossCam.current *= 0.95;
       if (bossCam.current < 0.001) bossCam.current = 0;
+    }
+
+    // Chapter intro pan: 0 → 1 → 0 over 1.5s
+    if (st.chapterIntro) {
+      const age = now - st.chapterIntro.born * 1000;
+      const t = Math.min(1, age / 1500);
+      chapterPan.current = Math.sin(t * Math.PI); // bell curve
+    } else {
+      chapterPan.current *= 0.92;
+      if (chapterPan.current < 0.001) chapterPan.current = 0;
     }
 
     // Soft follow target: selected unit's tile during player phase,
@@ -70,9 +83,12 @@ export function CameraController({ w, h }: { w: number; h: number }) {
       fx = (a.x + d.x) / 2;
       fz = (a.y + d.y) / 2;
     }
-    const camX = fx + Math.sin(azimuth.current) * Math.cos(el) * dist;
+    // Chapter intro: sweep the camera around the map while panning in.
+    const panAngle = chapterPan.current * Math.PI * 1.5; // 3/4 turn
+    const panR = chapterPan.current * Math.max(w, h) * 0.4;
+    const camX = fx + Math.sin(azimuth.current + panAngle) * Math.cos(el) * dist + Math.cos(azimuth.current + panAngle) * panR;
     const camY = Math.sin(el) * dist;
-    const camZ = fz + Math.cos(azimuth.current) * Math.cos(el) * dist;
+    const camZ = fz + Math.cos(azimuth.current + panAngle) * Math.cos(el) * dist - Math.sin(azimuth.current + panAngle) * panR;
     // Directional shake: shift camera target by a random vector scaled
     // by shakeAmount.  Crit hits feel like a punch because the shake
     // is brief but visible.

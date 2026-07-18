@@ -88,6 +88,11 @@ interface GameState {
   setLastAction: (kind: "attack" | "heal", targetUid: string) => void;
   clearLastAction: () => void;
   repeatLastAction: () => Promise<void>;
+  // Chapter intro: the camera pans from a corner to centre on chapter
+  // start, then lerps back to normal.  Stored as the chapter id + a
+  // timestamp so the camera can decay out.
+  chapterIntro: { chapterId: string; born: number } | null;
+  triggerChapterIntro: (chapterId: string) => void;
   useItemAction: (itemId: string) => void;
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
@@ -138,7 +143,7 @@ export const useGame = create<GameState>((set, get) => ({
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
-  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null,
+  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null, chapterIntro: null,
   activeDialogue: null,
   convoy: [
     { id: "vulnerary", type: "item", uses: 3 },
@@ -185,7 +190,7 @@ export const useGame = create<GameState>((set, get) => ({
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
     const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [], lastAction: null } as any);
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [], lastAction: null, chapterIntro: { chapterId: ch.id, born: performance.now() / 1000 } } as any);
   },
 
   selectUnit: (u) => {
@@ -428,6 +433,7 @@ export const useGame = create<GameState>((set, get) => ({
   },
   setLastAction: (kind, targetUid) => set({ lastAction: { kind, targetUid } }),
   clearLastAction: () => set({ lastAction: null }),
+  triggerChapterIntro: (chapterId) => set({ chapterIntro: { chapterId, born: performance.now() / 1000 } }),
   repeatLastAction: async () => {
     const st = get();
     if (!st.grid || !st.lastAction) return;
