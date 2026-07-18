@@ -80,6 +80,14 @@ interface GameState {
   pendingSlashTrails: { id: number; at: [number, number, number]; color: number; duration: number }[];
   drainProjectiles: () => { id: number; start: [number, number, number]; end: [number, number, number]; kind: string; color: number; duration: number }[];
   drainSlashTrails: () => { id: number; at: [number, number, number]; color: number; duration: number }[];
+  // Last attack: a (attackerId, targetId) pair.  When the player turns
+  // end without spending all their actions, the next turn can offer a
+  // "Repeat last attack" button that auto-attacks the same target again
+  // with whoever is in range.  Set after attackTarget/healTarget resolve.
+  lastAction: { kind: "attack" | "heal"; targetUid: string } | null;
+  setLastAction: (kind: "attack" | "heal", targetUid: string) => void;
+  clearLastAction: () => void;
+  repeatLastAction: () => Promise<void>;
   useItemAction: (itemId: string) => void;
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
@@ -104,7 +112,7 @@ const PROJ_KIND: Record<string, string> = {
   lance: "lance", axe: "axe", bow: "arrow", staff: "heal",
   wind: "ice", sword: "spark",
 };
-function queueProjectileForAttack(set: any, get: any, attacker: any, defender: any) {
+function queueProjectileForAttack(set: (fn: (s: any) => any) => void, get: () => any, attacker: any, defender: any) {
   const wt = attacker.equippedWeapon?.type;
   if (!wt) return;
   // Melee weapons fire a slash trail (no flying projectile).
@@ -130,7 +138,7 @@ export const useGame = create<GameState>((set, get) => ({
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
-  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null,
+  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null,
   activeDialogue: null,
   convoy: [
     { id: "vulnerary", type: "item", uses: 3 },
@@ -177,7 +185,7 @@ export const useGame = create<GameState>((set, get) => ({
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
     const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [] } as any);
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [], lastAction: null } as any);
   },
 
   selectUnit: (u) => {
@@ -257,15 +265,15 @@ export const useGame = create<GameState>((set, get) => ({
       setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
     }
     setP("exit", "", ""); await sleep(300);
-    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); (target as any)._lastKilledByWeapon = atk.equippedWeapon?.type; }
-    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); (atk as any)._lastKilledByWeapon = target.equippedWeapon?.type; }
+    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = atk.equippedWeapon?.type; }
+    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); atk._lastKilledByWeapon = target.equippedWeapon?.type; }
     if (!atk.isDead) {
       atk.exp += calculateExp(atk, target, target.isDead);
       const { leveledUp, newLevel } = maybeLevelUp(atk);
       if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(atk.def.id, get().lang), n: newLevel }), "#ffe070");
     }
     atk.hasActed = true;
-    set({ phase: "player", selectedUnit: null, pendingMove: null, units: [...g.getAllUnits()], activeCombat: null, combatPhase: null });
+    set({ phase: "player", selectedUnit: null, pendingMove: null, units: [...g.getAllUnits()], activeCombat: null, combatPhase: null, lastAction: { kind: "attack", targetUid: target.uid } });
     checkBattleEnd(set, get);
   },
 
@@ -288,7 +296,7 @@ export const useGame = create<GameState>((set, get) => ({
     get().addLog(t("logHeal", get().lang, { healer: unitName(healer.def.id, get().lang), target: unitName(target.def.id, get().lang), n: actual }), "#3aff3a");
     get().addDamageNumber([target.pos.x, 1.5, target.pos.y], actual, { isHeal: true });
     get().addHealAura([target.pos.x, 0.22, target.pos.y]);
-    set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()] });
+    set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()], lastAction: { kind: "heal", targetUid: target.uid } });
     checkBattleEnd(set, get);
   },
 
@@ -346,8 +354,8 @@ export const useGame = create<GameState>((set, get) => ({
           setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
         }
         setP("exit", "", ""); await sleep(300);
-        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); (target as any)._lastKilledByWeapon = u.equippedWeapon?.type; }
-        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); (u as any)._lastKilledByWeapon = target.equippedWeapon?.type; }
+        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = u.equippedWeapon?.type; }
+        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); u._lastKilledByWeapon = target.equippedWeapon?.type; }
         if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u); }
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
@@ -418,6 +426,33 @@ export const useGame = create<GameState>((set, get) => ({
       set({ units: [...st.grid!.getAllUnits()] });
     }
   },
+  setLastAction: (kind, targetUid) => set({ lastAction: { kind, targetUid } }),
+  clearLastAction: () => set({ lastAction: null }),
+  repeatLastAction: async () => {
+    const st = get();
+    if (!st.grid || !st.lastAction) return;
+    const target = st.units.find(u => u.uid === st.lastAction!.targetUid);
+    if (!target || target.isDead) { set({ lastAction: null }); return; }
+    const kind = st.lastAction.kind;
+    for (const u of st.units) {
+      if (u.faction !== "player" || u.isDead || u.hasActed) continue;
+      const w = u.equippedWeapon; if (!w) continue;
+      if (kind === "heal" && w.type !== "staff") continue;
+      if (kind === "attack" && w.type === "staff") continue;
+      const moveRange = st.grid.computeMoveRange(u.pos, u.classDef.baseMove, u.classDef.moveType, u.uid);
+      // Find a move target that gets us in range
+      for (const [k, path] of moveRange) {
+        const from = path[path.length - 1];
+        const atk = st.grid.computeAttackRange(from, w.minRange, w.maxRange);
+        if (atk.some(p => p.x === target.pos.x && p.y === target.pos.y)) {
+          set({ pendingMove: from, selectionMode: "actionMenu", selectedUnit: u, moveRange });
+          if (kind === "heal") { st.healTarget(target); }
+          else { st.attackTarget(target); }
+          return;
+        }
+      }
+    }
+  },
   addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
 }));
 
@@ -457,8 +492,8 @@ function checkBattleEnd(set: any, get: any) {
   }
   else if (ch.objectiveType === "seize" && ch.seizeTile) {
     // Win when any living player unit is standing on the seize tile.
-    const t = ch.seizeTile;
-    const onTile = players.some((u: RuntimeUnit) => u.pos.x === t.x && u.pos.y === t.y);
+    const stTile = ch.seizeTile;
+    const onTile = players.some((u: RuntimeUnit) => u.pos.x === stTile.x && u.pos.y === stTile.y);
     if (onTile) {
       const vd = getDialogueForTrigger(ch.id, "victory");
       set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
@@ -468,9 +503,8 @@ function checkBattleEnd(set: any, get: any) {
 
 // Dev hook — exposes the store + a few helpers on window so the headless
 // verification scripts can drive chapters + combat without replaying the
-// full UI.  Safe to leave in production: it's a thin pointer to the
-// same store the React tree uses.
-if (typeof window !== "undefined") {
+// full UI.  Production builds skip this entirely (no leaked references).
+if (typeof window !== "undefined" && import.meta.env.DEV) {
   (window as any).__game = useGame;
   (window as any).__initChapter = (i: number) => useGame.getState().initChapter(i);
   (window as any).__endTurn = () => useGame.getState().endPlayerTurn();

@@ -223,9 +223,9 @@ export const CHAPTERS: ChapterDef[] = [
       {unitId:"cultist",pos:{x:6,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:6,y:8},aiType:"aggressive"},
       {unitId:"cultist",pos:{x:8,y:3},aiType:"aggressive"},{unitId:"cultist",pos:{x:8,y:7},aiType:"aggressive"},
       {unitId:"cult_archer",pos:{x:10,y:4},aiType:"sniper"},{unitId:"cult_archer",pos:{x:10,y:6},aiType:"sniper"},
-      {unitId:"cultist_heavy",pos:{x:12,y:5},aiType:"defensive"},
+      {unitId:"cultist_heavy",pos:{x:12,y:5},aiType:"aggressive_auto"},
     ],
-    reinforcements: [{turn:2,unitId:"cultist",pos:{x:15,y:3},aiType:"aggressive"},{turn:3,unitId:"cultist_heavy",pos:{x:15,y:9},aiType:"aggressive"},{turn:5,unitId:"umbral_mage",pos:{x:14,y:5},aiType:"sniper"}],
+    reinforcements: [{turn:2,unitId:"cultist",pos:{x:15,y:3},aiType:"aggressive_auto"},{turn:3,unitId:"cultist_heavy",pos:{x:15,y:9},aiType:"aggressive_auto"},{turn:5,unitId:"umbral_mage",pos:{x:14,y:5},aiType:"sniper"}],
   },
   {
     id: "ch07", name: "The Undercity", desc: "Find the cult temple in the sewers", objective: "Reach the temple",

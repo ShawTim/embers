@@ -31,6 +31,22 @@ export function decideAIAction(unit: RuntimeUnit, grid: GameGrid, allUnits: Runt
       for (const [k, p] of moveRange) { const d = p[p.length - 1]; if (manhattan(unit.pos, d) <= 2) limited.set(k, p); }
       return decideAggressive(unit, grid, enemies, limited);
     }
+    case "aggressive_auto": {
+      // Aggressive: closes distance to nearest enemy and never waits
+      // unless surrounded.  Use decideAggressive to find an attack
+      // this turn, but fall back to a "move toward nearest" if no
+      // in-range target exists.
+      const dec = decideAggressive(unit, grid, enemies, moveRange);
+      if (dec.action !== "wait") return dec;
+      if (!enemies.length) return dec;
+      const near = findNearest(unit, enemies);
+      if (near) {
+        let bp = unit.pos, bd = manhattan(unit.pos, near.pos);
+        for (const [k, path] of moveRange) { const d = manhattan(path[path.length - 1], near.pos); if (d < bd) { bd = d; bp = path[path.length - 1]; } }
+        if (bp.x !== unit.pos.x || bp.y !== unit.pos.y) return { action: "move", moveTarget: bp, path: moveRange.get(`${bp.x},${bp.y}`) };
+      }
+      return dec;
+    }
     default: return decideAggressive(unit, grid, enemies, moveRange);
   }
 }

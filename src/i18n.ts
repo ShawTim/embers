@@ -20,6 +20,7 @@ const STRINGS = {
   ready: { en: "ready", zh: "可行動" },
   enemies: { en: "enemies", zh: "敵人" },
   endTurn: { en: "End Turn", zh: "結束回合" },
+  repeatLast: { en: "Repeat Last", zh: "重複上回" },
   f_player: { en: "ALLY", zh: "我方" },
   f_enemy: { en: "ENEMY", zh: "敵方" },
   f_ally: { en: "FRIEND", zh: "友軍" },

@@ -12,6 +12,8 @@ export function HUD() {
   const phase = useGame(s => s.phase);
   const chapter = useGame(s => s.chapter);
   const endPlayerTurn = useGame(s => s.endPlayerTurn);
+  const repeatLastAction = useGame(s => s.repeatLastAction);
+  const lastAction = useGame(s => s.lastAction);
   const hoveredTile = useGame(s => s.hoveredTile);
   const hoveredUnit = useGame(s => s.hoveredUnit);
   const grid = useGame(s => s.grid);
@@ -37,6 +39,9 @@ export function HUD() {
       <div className="objective">{chapter ? chapterInfo(chapter.id, "obj", lang) : ""}</div>
       <div className="unit-counts">{playerReady}/{playerTotal} {tt("ready")} · {enemyAlive} {tt("enemies")}</div>
       <LangToggle />
+      {phase === "player" && lastAction && playerReady > 0 && (
+        <button className="btn-repeat-last" onClick={repeatLastAction} title="Repeat last attack/heal on the same target">{tt("repeatLast")}</button>
+      )}
       {phase === "player" && <button className="btn-end-turn" onClick={endPlayerTurn}>{tt("endTurn")}</button>}
     </div>
     <div className="hud-bottom-left"><div className="panel tile-info">{terrainDef ? (<><div className="terrain-name">{tt(terrainDef.type as StringKey)}</div><div className="terrain-stats">{terrainDef.defBonus > 0 && <span>DEF +{terrainDef.defBonus} </span>}{terrainDef.avoidBonus > 0 && <span>AVO {terrainDef.avoidBonus}% </span>}{terrainDef.healPercent > 0 && <span>HP +{terrainDef.healPercent}%</span>}{terrainDef.defBonus === 0 && terrainDef.avoidBonus === 0 && terrainDef.healPercent === 0 && <span style={{ color: "#556" }}>{tt("noBonus")}</span>}</div></>) : <div style={{ color: "#556", fontSize: 13 }}>{tt("hoverTile")}</div>}</div></div>

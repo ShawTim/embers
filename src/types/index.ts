@@ -90,7 +90,7 @@ export interface UnitDef {
 }
 
 export type AIType =
-  | "aggressive" | "defensive" | "stationary"
+  | "aggressive" | "aggressive_auto" | "defensive" | "stationary"
   | "sniper" | "healer" | "boss";
 
 export interface ChapterDef {
@@ -141,4 +141,6 @@ export interface RuntimeUnit {
   aiType: AIType;
   skills: string[];
   modelId: string;
+  /** Set by the store when this unit dies in combat. Drives death VFX. */
+  _lastKilledByWeapon?: WeaponType;
 }
