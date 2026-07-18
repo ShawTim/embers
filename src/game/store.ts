@@ -35,6 +35,9 @@ interface GameState {
   healAuras: { id: number; position: [number, number, number]; born: number }[];
   bloodDecals: { id: number; position: [number, number, number]; born: number }[];
   screenShake: number;
+  timeScale: number;        // 1.0 = normal, 0.3 = slow-mo
+  slowMoUntil: number;      // performance.now() ms timestamp
+  bossEntrance: { name: string; born: number; dur: number } | null;  // BOSS intro cinematic
   activeCombat: { attacker: RuntimeUnit; defender: RuntimeUnit } | null;
   combatPhase: { phase: string; attackerId: string; defenderId: string; isCounter: boolean } | null;
 
@@ -64,6 +67,8 @@ interface GameState {
   addDamageNumber: (p: [number, number, number], amt: number, opts?: { isCrit?: boolean; isHeal?: boolean; isMiss?: boolean }) => void;
   removeDamageNumber: (id: number) => void;
   triggerShake: (amt: number) => void;
+  triggerSlowMo: (scale: number, durationMs: number) => void;
+  triggerBossEntrance: (name: string, dur: number) => void;
   addLog: (text: string, color?: string) => void;
   activeDialogue: string | null;
   setDialogue: (id: string | null) => void;
@@ -82,7 +87,7 @@ export const useGame = create<GameState>((set, get) => ({
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
-  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, activeCombat: null, combatPhase: null,
+  hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null,
   activeDialogue: null,
   convoy: [
     { id: "vulnerary", type: "item", uses: 3 },
@@ -129,7 +134,7 @@ export const useGame = create<GameState>((set, get) => ({
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
     const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], activeCombat: null, combatPhase: null, activeDialogue: preDialogue });
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false } as any);
   },
 
   selectUnit: (u) => {
@@ -189,15 +194,16 @@ export const useGame = create<GameState>((set, get) => ({
         get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ffffff");
         get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit);
         get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
-        get().triggerShake(r.crit ? 0.4 : 0.2);
+        get().triggerShake(r.crit ? 0.7 : 0.25);
+        if (r.crit) get().triggerSlowMo(0.25, 280);
       } else { get().addLog(t("logMiss", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang) }), "#888"); get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], 0, { isMiss: true }); }
       setP(pf + "impact", r.attacker.uid, r.defender.uid, ic); await sleep(150);
       setP(pf + "recoil", r.attacker.uid, r.defender.uid, ic); await sleep(350);
       setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
     }
     setP("exit", "", ""); await sleep(300);
-    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); }
-    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); }
+    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); (target as any)._lastKilledByWeapon = atk.equippedWeapon?.type; }
+    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); (atk as any)._lastKilledByWeapon = target.equippedWeapon?.type; }
     if (!atk.isDead) {
       atk.exp += calculateExp(atk, target, target.isDead);
       const { leveledUp, newLevel } = maybeLevelUp(atk);
@@ -238,6 +244,18 @@ export const useGame = create<GameState>((set, get) => ({
   processEnemyTurn: async () => {
     const st = get(); const g = st.grid; if (!g) return;
     const enemies = st.units.filter(u => u.faction === "enemy" && !u.isDead);
+    // Cinematic intro: the first time the boss is alive at the start
+    // of an enemy turn (and we haven't already done it this chapter),
+    // play a 1.2s name fade-in with a hard camera shake + 0.5s
+    // slow-mo.  Sets a once-flag on the store so it only fires once.
+    const boss = enemies.find(u => u.isBoss);
+    if (boss && !(st as any)._bossIntroDone) {
+      get().triggerBossEntrance(unitName(boss.def.id, get().lang), 1.2);
+      get().triggerShake(0.8);
+      get().triggerSlowMo(0.4, 500);
+      set({ _bossIntroDone: true } as any);
+      await sleep(900);
+    }
     for (const u of enemies) { u.hasMoved = false; u.hasActed = false; }
     for (const u of enemies) {
       if (u.isDead) continue;
@@ -260,15 +278,16 @@ export const useGame = create<GameState>((set, get) => ({
             get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ff8a5a");
             get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit);
             get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
-            get().triggerShake(r.crit ? 0.4 : 0.2);
+            get().triggerShake(r.crit ? 0.7 : 0.25);
+            if (r.crit) get().triggerSlowMo(0.25, 280);
           } else { get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], 0, { isMiss: true }); }
           setP(pf + "impact", r.attacker.uid, r.defender.uid, ic); await sleep(150);
           setP(pf + "recoil", r.attacker.uid, r.defender.uid, ic); await sleep(350);
           setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
         }
         setP("exit", "", ""); await sleep(300);
-        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); }
-        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); }
+        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); (target as any)._lastKilledByWeapon = u.equippedWeapon?.type; }
+        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); (u as any)._lastKilledByWeapon = target.equippedWeapon?.type; }
         if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u); }
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
@@ -303,6 +322,8 @@ export const useGame = create<GameState>((set, get) => ({
   addDamageNumber: (p, amt, opts = {}) => set(s => ({ damageNumbers: [...s.damageNumbers, { id: Date.now() + Math.random(), position: p, amount: amt, isCrit: opts.isCrit || false, isHeal: opts.isHeal || false, isMiss: opts.isMiss || false }] })),
   removeDamageNumber: (id) => set(s => ({ damageNumbers: s.damageNumbers.filter(n => n.id !== id) })),
   triggerShake: (amt) => set({ screenShake: amt }),
+  triggerSlowMo: (scale, durationMs) => set({ timeScale: scale, slowMoUntil: performance.now() + durationMs }),
+  triggerBossEntrance: (name, dur) => set({ bossEntrance: { name, born: performance.now() / 1000, dur } }),
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),
   clearDialogue: () => set({ activeDialogue: null }),

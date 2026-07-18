@@ -104,6 +104,8 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const targetRotY = useRef(0);
   const curRotY = useRef(0);
   const prevHp = useRef(unit.hp);
+  const deathStyle = useRef<"melee" | "magic">("melee");
+  const deathAge = useRef(0);
   // Shared swing state (weapon mesh + manual lean override). The
   // attack animation (attackSlash) sets leanX/leanZ; the useFrame
   // here applies them after the mixer so the GLB idle animation
@@ -172,6 +174,10 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
   const inAttackRange = selectionMode === "targeting" && attackRange.includes(`${unit.pos.x},${unit.pos.y}`);
   const hpPct = unit.hp / unit.maxHp;
   const hpColor = hpPct > 0.5 ? "#3afa3a" : hpPct > 0.25 ? "#fafa3a" : "#fa3a3a";
+  // Smoothed HP percentage — the actual unit.hp jumps on hit; this
+  // ref tweens over ~0.3s so the bar drains like a real RPG.
+  const displayedHp = useRef(hpPct);
+  const hpBarMesh = useRef<THREE.Mesh>(null);
   const MOVE_DURATION = 500;
 
   useEffect(() => {
@@ -229,14 +235,37 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
 
   useEffect(() => { if (isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idleB || ANIM.idle, true, 0.2); else if (!isSelected && !moveTo.current && !combatPhase) playAnim(ANIM.idle, true, 0.3); }, [isSelected]);
   useEffect(() => { if (unit.hp < prevHp.current) { setFlashRed(true); const tm = setTimeout(() => setFlashRed(false), 120); prevHp.current = unit.hp; return () => clearTimeout(tm); } prevHp.current = unit.hp; }, [unit.hp]);
-  useEffect(() => { if (unit.isDead && !dead) { playAnim(ANIM.deathA, false, 0.2); const tm = setTimeout(() => setDead(true), 2000); return () => clearTimeout(tm); } }, [unit.isDead]);
+  useEffect(() => { if (unit.isDead && !dead) {
+    // Pick a death style from the attacker's weapon so melee kills
+    // tumble back, magic kills dissolve in a purple glow.
+    const w = unit._lastKilledByWeapon;
+    const style: "melee" | "magic" = w && (w === "fire" || w === "light" || w === "dark") ? "magic" : "melee";
+    deathStyle.current = style;
+    playAnim(ANIM.deathA, false, 0.2);
+    if (style === "magic") {
+      // Magic kills get a shorter death so the model disappears
+      // before the dissolve shader has a chance to mis-render.
+      const tm = setTimeout(() => setDead(true), 1400);
+      return () => clearTimeout(tm);
+    }
+    const tm = setTimeout(() => setDead(true), 2000);
+    return () => clearTimeout(tm);
+  } }, [unit.isDead]);
 
   const onPointerEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; hoverUnit(unit); if (selectionMode === "targeting" && unit.faction !== "player") { const sel = useGame.getState().selectedUnit; if (sel) showCombatPreview(sel, unit); } };
   const onPointerLeave = () => { setHovered(false); document.body.style.cursor = "default"; const cur = useGame.getState().hoveredUnit; if (cur === unit) hoverUnit(null); };
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); if (phase !== "player") return; if (selectionMode === "targeting" && unit.faction !== "player") onTileClick(unit.pos); else if (unit.faction === "player" && !unit.hasActed) selectUnit(unit); else hoverUnit(unit); };
 
   useFrame((state, delta) => {
-    if (mixerRef.current && !isFarLod.current) mixerRef.current.update(delta);
+    const st = useGame.getState();
+    const now = performance.now();
+    let scale = st.timeScale;
+    if (st.slowMoUntil && now >= st.slowMoUntil) {
+      scale = 1;
+      if (st.timeScale !== 1) useGame.setState({ timeScale: 1, slowMoUntil: 0 });
+    }
+    const sd = delta * scale;
+    if (mixerRef.current && !isFarLod.current) mixerRef.current.update(sd);
     // Apply the manual lean override so the GLB idle animation can't
     // push the body into a weird pose (e.g. -π headstand). The
     // shared melee animation writes to swing.current.leanX/Z; here we
@@ -257,9 +286,49 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
       groupRef.current.position.x = THREE.MathUtils.lerp(moveFrom.current.x, moveTo.current.x, et); groupRef.current.position.z = THREE.MathUtils.lerp(moveFrom.current.z, moveTo.current.z, et); isMoving = t < 1;
       if (t >= 1) { moveFrom.current = null; moveTo.current = null; playAnim(isSelected ? (ANIM.idleB || ANIM.idle) : ANIM.idle, true, 0.2); }
     }
-    if (modelRef.current) { const diff = targetRotY.current - curRotY.current; const wr = ((diff + Math.PI) % (Math.PI*2)) - Math.PI; curRotY.current += wr * Math.min(1, delta * 8); modelRef.current.rotation.y = curRotY.current; }
-    if (modelRef.current && isSelected && !isMoving && !combatPhase && gs.selectionMode !== "moving") modelRef.current.position.y = Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.08;
-    else if (modelRef.current) modelRef.current.position.y = THREE.MathUtils.lerp(modelRef.current.position.y, 0, 0.15);
+    if (modelRef.current) { const diff = targetRotY.current - curRotY.current; const wr = ((diff + Math.PI) % (Math.PI*2)) - Math.PI; curRotY.current += wr * Math.min(1, sd * 8); modelRef.current.rotation.y = curRotY.current; }
+    // Death animation: once the unit is flagged dead but the model is
+    // still visible (between isDead && !dead), drive either a melee
+    // collapse (forward tumble) or a magic dissolve (float up + fade).
+    if (modelRef.current && unit.isDead) {
+      deathAge.current += sd;
+      const t = Math.min(1, deathAge.current / 1.6);
+      if (deathStyle.current === "magic") {
+        modelRef.current.position.y = 0.05 + t * 0.4;
+        modelRef.current.rotation.x = t * 0.2;
+        modelRef.current.traverse((c: any) => {
+          if (c.isMesh && c.material) {
+            const mats = Array.isArray(c.material) ? c.material : [c.material];
+            mats.forEach((m: any) => { m.transparent = true; m.opacity = 1 - t; });
+          }
+        });
+      } else {
+        // Melee — collapse backward (away from the camera) over 1.2s.
+        modelRef.current.rotation.x = -t * Math.PI / 2;
+        modelRef.current.position.y = -t * 0.1;
+      }
+    }
+    // Smooth the HP bar toward the current value (~0.3s ease).
+    displayedHp.current = THREE.MathUtils.lerp(displayedHp.current, hpPct, Math.min(1, sd * 5));
+    if (hpBarMesh.current) {
+      const w = Math.max(0.01, 0.78 * displayedHp.current);
+      hpBarMesh.current.scale.x = w / 0.78;
+      hpBarMesh.current.position.x = -0.4 + (0.78 * displayedHp.current) / 2;
+    }
+    if (modelRef.current) {
+      // Idle breathing: every unit gets a per-uid phase so they don't
+      // all bob in sync.  Tiny amplitude (~3cm) is just enough to read
+      // as "alive" without distracting from combat.
+      const phase = unit.uid.charCodeAt(unit.uid.length - 1) * 0.31;
+      const breath = (Math.sin(state.clock.elapsedTime * 1.5 + phase) * 0.5 + 0.5) * 0.03;
+      if (isSelected && !isMoving && !combatPhase && gs.selectionMode !== "moving") {
+        // Selected units get the punchier selected-bob in addition
+        // to their own breath so they read as "ready to act".
+        modelRef.current.position.y = breath + Math.abs(Math.sin(state.clock.elapsedTime * 4)) * 0.08;
+      } else {
+        modelRef.current.position.y = THREE.MathUtils.lerp(modelRef.current.position.y, breath, 0.15);
+      }
+    }
     if (ringRef.current && (isSelected || hovered)) { const s = 1 + Math.sin(state.clock.elapsedTime * 4) * 0.06; ringRef.current.scale.set(s, s, 1); }
     // LOD: at long camera distance, swap the GLB for a cheap billboard
     // so we don't keep animating dozens of skeletons. The billboard is
@@ -302,7 +371,7 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
       {flashRed && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 12, 12]} /><meshBasicMaterial color="#ffffff" transparent opacity={0.55} depthWrite={false} /></mesh>}
       {isExhausted && <mesh position={[0, 0.7, 0]}><sphereGeometry args={[0.6, 8, 8]} /><meshBasicMaterial color="#000000" transparent opacity={0.2} depthWrite={false} /></mesh>}
       {unit.isBoss && <BossCrown />}
-      <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh position={[-0.4 + (0.78*hpPct)/2, 0, 0.001]}><planeGeometry args={[Math.max(0.01, 0.78*hpPct), 0.06]} /><meshBasicMaterial color={hpColor} /></mesh></group>
+      <group position={[0, TARGET_HEIGHT + 0.55, 0]}><mesh><planeGeometry args={[0.8, 0.1]} /><meshBasicMaterial color="#000" transparent opacity={0.6} /></mesh><mesh ref={hpBarMesh} position={[-0.4 + (0.78*displayedHp.current)/2, 0, 0.001]}><planeGeometry args={[0.78, 0.06]} /><meshBasicMaterial color={hpColor} /></mesh></group>
       {selectionMode !== "moving" && <mesh position={[0, 0.7, 0]} onPointerEnter={onPointerEnter} onPointerLeave={onPointerLeave} onPointerDown={onPointerDown}><cylinderGeometry args={[0.4, 0.4, 1.5, 8]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>}
     </group>
   );
