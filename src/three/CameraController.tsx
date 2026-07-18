@@ -10,6 +10,16 @@ export function CameraController({ w, h }: { w: number; h: number }) {
   const shakeAmount = useRef(0), prevShake = useRef(0), combatZoom = useRef(0);
   const azimuth = useRef(0), elevation = useRef(0.85), distance = useRef(h * 1.1);
   const panX = useRef(0), panZ = useRef(0);
+  // Soft follow: when a player unit is selected (and not in combat),
+  // the camera target lerps toward the unit's tile.  When the selection
+  // is cleared or the player ends their turn, the camera glides back to
+  // the map centre.
+  const followX = useRef(0), followZ = useRef(0);
+  // BOSS turn pull-back: when a BOSS intro cinematic fires, briefly
+  // zoom out + lower the camera so the player gets a "this is a big
+  // guy" beat.  Decays back to normal over ~1.5s.
+  const bossCam = useRef(0);
+  const bossCamUntil = useRef(0);
   const dragMode = useRef<DragMode>("none"), lastPointer = useRef({ x: 0, y: 0 });
   const potentialDrag = useRef<{ x: number; y: number; button: number; shift: boolean } | null>(null);
   const DRAG_THRESHOLD = 12;
@@ -19,13 +29,57 @@ export function CameraController({ w, h }: { w: number; h: number }) {
     const st = useGame.getState();
     if (st.screenShake > 0 && st.screenShake !== prevShake.current) { shakeAmount.current = Math.max(shakeAmount.current, st.screenShake); prevShake.current = st.screenShake; }
     if (shakeAmount.current > 0.01) shakeAmount.current *= 0.88; else shakeAmount.current = 0;
+
     const tz = st.activeCombat ? 1 : 0; combatZoom.current = THREE.MathUtils.lerp(combatZoom.current, tz, 0.06);
     const z = combatZoom.current;
-    const dist = distance.current * (1 - z * 0.6), el = elevation.current - z * 0.3;
-    let fx = cx + panX.current, fz = cz + panZ.current;
-    if (st.activeCombat && z > 0.15) { const a = st.activeCombat.attacker.pos, d = st.activeCombat.defender.pos; fx = (a.x + d.x) / 2; fz = (a.y + d.y) / 2; }
-    const camX = fx + Math.sin(azimuth.current) * Math.cos(el) * dist, camY = Math.sin(el) * dist, camZ = fz + Math.cos(azimuth.current) * Math.cos(el) * dist;
-    camera.position.set(camX + (Math.random()-0.5)*shakeAmount.current, camY + (Math.random()-0.5)*shakeAmount.current, camZ);
+
+    // BOSS intro: peak bossCam at 1.0, then decay to 0 over ~1.5s.
+    const now = performance.now();
+    if (st.bossEntrance) {
+      bossCam.current = 1;
+      bossCamUntil.current = now + 1500;
+    } else if (now >= bossCamUntil.current) {
+      bossCam.current *= 0.95;
+      if (bossCam.current < 0.001) bossCam.current = 0;
+    }
+
+    // Soft follow target: selected unit's tile during player phase,
+    // map centre otherwise.  Lerp the follow refs smoothly.
+    let targetFx: number, targetFz: number;
+    if (st.phase === "player" && st.selectedUnit && !st.activeCombat) {
+      targetFx = st.selectedUnit.pos.x - cx + panX.current;
+      targetFz = st.selectedUnit.pos.y - cz + panZ.current;
+    } else {
+      targetFx = panX.current;
+      targetFz = panZ.current;
+    }
+    const followLerp = st.activeCombat ? 0.18 : 0.05;
+    followX.current = THREE.MathUtils.lerp(followX.current, targetFx, followLerp);
+    followZ.current = THREE.MathUtils.lerp(followZ.current, targetFz, followLerp);
+
+    // BOSS pull-back widens the distance and lowers the elevation.
+    const bossDist = 1 + bossCam.current * 0.35;
+    const bossEl = 1 - bossCam.current * 0.18;
+
+    const dist = distance.current * (1 - z * 0.6) * bossDist;
+    const el = (elevation.current - z * 0.3) * bossEl;
+    let fx = cx + followX.current;
+    let fz = cz + followZ.current;
+    if (st.activeCombat && z > 0.15) {
+      const a = st.activeCombat.attacker.pos, d = st.activeCombat.defender.pos;
+      fx = (a.x + d.x) / 2;
+      fz = (a.y + d.y) / 2;
+    }
+    const camX = fx + Math.sin(azimuth.current) * Math.cos(el) * dist;
+    const camY = Math.sin(el) * dist;
+    const camZ = fz + Math.cos(azimuth.current) * Math.cos(el) * dist;
+    // Directional shake: shift camera target by a random vector scaled
+    // by shakeAmount.  Crit hits feel like a punch because the shake
+    // is brief but visible.
+    const sx = (Math.random() - 0.5) * shakeAmount.current;
+    const sy = (Math.random() - 0.5) * shakeAmount.current * 0.6;
+    const sz = (Math.random() - 0.5) * shakeAmount.current;
+    camera.position.set(camX + sx, camY + sy, camZ + sz);
     camera.lookAt(fx, 0.5, fz);
   });
 

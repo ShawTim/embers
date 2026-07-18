@@ -15,7 +15,16 @@ import * as THREE from "three";
 //    - lets us clamp to 1 frame per r3f frame instead of 1 per RAF tick
 // ---------------------------------------------------------------------------
 
-export type ProjectileKind = "fireball" | "arrow" | "spark";
+export type ProjectileKind =
+  | "fireball"   // orange/yellow flame orb + flame shell
+  | "arrow"      // wooden shaft + fins
+  | "spark"      // generic small white-blue spark
+  | "ice"        // pale-blue crystal cluster
+  | "lightning"  // yellow-white branching bolt + spark trail
+  | "dark"       // purple void orb with darker halo
+  | "lance"      // thrusting lance-tip streak
+  | "axe"        // heavy axe arc
+  | "heal";      // soft green wisp
 
 export interface ProjectileSpec {
   parent: THREE.Object3D;
@@ -142,6 +151,11 @@ export function tickProjectiles(delta: number) {
     _p.add(_m).add(_e);
     p.mesh.position.copy(_p);
     if (p.kind === "arrow") p.mesh.lookAt(p.end);
+    if (p.kind === "ice" || p.kind === "fireball" || p.kind === "dark" || p.kind === "heal" || p.kind === "lightning") {
+      p.mesh.rotation.x += delta * 4.0;
+      p.mesh.rotation.y += delta * 3.0;
+    }
+    if (p.kind === "axe") p.mesh.rotation.z += delta * 8.0;
 
     if (
       p.trail.length === 0 ||
@@ -196,25 +210,170 @@ function makeProjectileMesh(kind: ProjectileKind, color: THREE.Color): THREE.Obj
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
     );
   }
-  // fireball: glowing red-orange sphere with an outer flame shell
-  const grp = new THREE.Group();
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.15, 10, 10),
+  if (kind === "fireball") {
+    // fireball: glowing red-orange sphere with an outer flame shell
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 10, 10),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
+    );
+    grp.add(core);
+    const flameColor = new THREE.Color(0xff8030);
+    const flame = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 10, 10),
+      new THREE.MeshBasicMaterial({
+        color: flameColor,
+        transparent: true,
+        opacity: 0.35,
+        depthWrite: false,
+      }),
+    );
+    grp.add(flame);
+    return grp;
+  }
+  if (kind === "ice") {
+    // ice: pale-blue crystal — 4 tetrahedra arranged around a core
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.18, 0),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
+    );
+    grp.add(core);
+    for (let i = 0; i < 4; i++) {
+      const t = new THREE.Mesh(
+        new THREE.TetrahedronGeometry(0.12, 0),
+        new THREE.MeshBasicMaterial({
+          color: 0xcfeeff,
+          transparent: true,
+          opacity: 0.7,
+          depthWrite: false,
+        }),
+      );
+      const a = (i / 4) * Math.PI * 2;
+      t.position.set(Math.cos(a) * 0.2, Math.sin(a) * 0.2, Math.cos(a + Math.PI / 4) * 0.2);
+      t.rotation.set(a, a * 0.7, a * 0.5);
+      grp.add(t);
+    }
+    return grp;
+  }
+  if (kind === "lightning") {
+    // lightning: bright yellow-white bolt with spark trail
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.14, 8, 8),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1.0 }),
+    );
+    grp.add(core);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.28, 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.45,
+        depthWrite: false,
+      }),
+    );
+    grp.add(halo);
+    return grp;
+  }
+  if (kind === "dark") {
+    // dark: deep purple void orb with darker halo
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.16, 12, 12),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
+    );
+    grp.add(core);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.30, 12, 12),
+      new THREE.MeshBasicMaterial({
+        color: 0x1a0428,
+        transparent: true,
+        opacity: 0.55,
+        depthWrite: false,
+      }),
+    );
+    grp.add(halo);
+    return grp;
+  }
+  if (kind === "lance") {
+    // lance: short bluish-white streak (thrusting attack)
+    return new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.04, 0.5, 4, 6),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
+    );
+  }
+  if (kind === "axe") {
+    // axe: heavy red-orange disc (chopping attack)
+    const grp = new THREE.Group();
+    const disc = new THREE.Mesh(
+      new THREE.CircleGeometry(0.18, 12),
+      new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: true, opacity: 0.95 }),
+    );
+    disc.rotation.x = Math.PI / 2;
+    grp.add(disc);
+    return grp;
+  }
+  if (kind === "heal") {
+    // heal: soft green upward wisp
+    const grp = new THREE.Group();
+    const core = new THREE.Mesh(
+      new THREE.SphereGeometry(0.10, 8, 8),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 }),
+    );
+    grp.add(core);
+    const halo = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: 0xa0ffa0,
+        transparent: true,
+        opacity: 0.4,
+        depthWrite: false,
+      }),
+    );
+    grp.add(halo);
+    return grp;
+  }
+  // Fallback: plain sphere
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(0.15, 8, 8),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95 }),
   );
-  grp.add(core);
-  const flameColor = new THREE.Color(0xff8030);
-  const flame = new THREE.Mesh(
-    new THREE.SphereGeometry(0.28, 10, 10),
-    new THREE.MeshBasicMaterial({
-      color: flameColor,
-      transparent: true,
-      opacity: 0.35,
-      depthWrite: false,
-    }),
-  );
-  grp.add(flame);
-  return grp;
+}
+
+/**
+ * Color for a given weapon type — used by both the projectile and the
+ * impact effect so the spell looks consistent. Keep this aligned with
+ * `orbColorFor` in Unit3D.tsx.
+ */
+export function colorForWeapon(weaponType: string | undefined, fallback = 0xffffff): THREE.Color {
+  switch (weaponType) {
+    case "fire":     return new THREE.Color(0xff5530);
+    case "light":    return new THREE.Color(0xfff5b0);
+    case "dark":     return new THREE.Color(0x8030c0);
+    case "lance":    return new THREE.Color(0xa0d0ff);
+    case "axe":      return new THREE.Color(0xff8030);
+    case "bow":      return new THREE.Color(0xc0a070);
+    case "staff":    return new THREE.Color(0x3aff8a);
+    case "thunder":  return new THREE.Color(0xfff060);
+    case "wind":     return new THREE.Color(0xa0ffd0);
+    default:         return new THREE.Color(fallback);
+  }
+}
+
+export function projectileKindForWeapon(weaponType: string | undefined): ProjectileKind {
+  switch (weaponType) {
+    case "fire":     return "fireball";
+    case "light":    return "lightning";
+    case "dark":     return "dark";
+    case "lance":    return "lance";
+    case "axe":      return "axe";
+    case "bow":      return "arrow";
+    case "staff":    return "heal";
+    case "thunder":  return "lightning";
+    case "wind":     return "ice";
+    default:         return "spark";
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -21,7 +21,7 @@ import { useFrame } from "@react-three/fiber";
 //  recentre (useful when placing them over a particular map cell).
 // ---------------------------------------------------------------------------
 
-type Kind = "dust" | "ember" | "leaf" | "spark";
+type Kind = "dust" | "ember" | "leaf" | "spark" | "rain" | "snow" | "ash";
 
 export interface AmbientParticlesProps {
   kind: Kind;
@@ -101,14 +101,39 @@ export function AmbientParticles({
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 64;
     const ctx = canvas.getContext("2d")!;
-    const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
     if (kind === "leaf") {
       // Slightly off-center green ellipse
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.ellipse(32, 32, 18, 8, Math.PI / 4, 0, Math.PI * 2);
       ctx.fill();
+    } else if (kind === "rain") {
+      // Vertical streak — slim pale-blue line that reads as a fast drop
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(32, 8);
+      ctx.lineTo(32, 56);
+      ctx.stroke();
+    } else if (kind === "snow") {
+      // Soft white flake — radial gradient, slightly off-center
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.4, "rgba(255,255,255,0.85)");
+      grad.addColorStop(1, "rgba(255,255,255,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+    } else if (kind === "ash") {
+      // Grayish flake — looks like a smouldering ember speck
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 30);
+      grad.addColorStop(0, color);
+      grad.addColorStop(0.5, "rgba(80,80,80,0.6)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
     } else {
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
       grad.addColorStop(0, "rgba(255,255,255,1)");
       grad.addColorStop(0.4, "rgba(255,255,255,0.7)");
       grad.addColorStop(1, "rgba(255,255,255,0)");
@@ -125,7 +150,7 @@ export function AmbientParticles({
       opacity,
       depthWrite: false,
       sizeAttenuation: true,
-      blending: kind === "leaf" ? THREE.NormalBlending : THREE.AdditiveBlending,
+      blending: kind === "leaf" || kind === "rain" || kind === "snow" ? THREE.NormalBlending : THREE.AdditiveBlending,
     });
   }, [kind, color, size, opacity]);
 
@@ -162,6 +187,32 @@ export function AmbientParticles({
         pos[idx + 0] = seed[idx + 0] + Math.sin(t * 0.5 + ph0) * 0.8;
         pos[idx + 1] = y0 + cycleY - lifeT * cycleY;
         pos[idx + 2] = seed[idx + 2] + Math.cos(t * 0.4 + ph0 * 1.3) * 0.8;
+      } else if (kind === "rain") {
+        // Fast vertical drop with a tiny horizontal drift.  Reset to
+        // top when below ground.  Streak sprite is drawn as a vertical
+        // line so a tall "fall" reads naturally without skewing.
+        const cycleY = area[1] * 1.2;
+        const y0 = seed[idx + 1];
+        const fallT = ((t * 1.6 * sp0 + ph0) % cycleY) / cycleY;
+        pos[idx + 0] = seed[idx + 0] + Math.sin(t * 0.5 + ph0) * 0.15;
+        pos[idx + 1] = y0 + cycleY - fallT * cycleY;
+        pos[idx + 2] = seed[idx + 2] + Math.cos(t * 0.3 + ph0) * 0.15;
+      } else if (kind === "snow") {
+        // Slow flutter downward with wider side-to-side sway than rain.
+        const cycleY = area[1] * 1.4;
+        const y0 = seed[idx + 1];
+        const fallT = ((t * 0.25 * sp0 + ph0) % cycleY) / cycleY;
+        pos[idx + 0] = seed[idx + 0] + Math.sin(t * 0.4 + ph0) * 0.6;
+        pos[idx + 1] = y0 + cycleY - fallT * cycleY;
+        pos[idx + 2] = seed[idx + 2] + Math.cos(t * 0.3 + ph0 * 1.3) * 0.6;
+      } else if (kind === "ash") {
+        // Slow rising gray flakes drifting on a hot updraft.
+        const cycleY = area[1] * 1.5;
+        const y0 = seed[idx + 1];
+        const lifeT = ((t * 0.12 * sp0 + ph0) % cycleY) / cycleY;
+        pos[idx + 0] = seed[idx + 0] + Math.sin(t * 0.25 + ph0) * 0.7;
+        pos[idx + 1] = y0 + lifeT * cycleY;
+        pos[idx + 2] = seed[idx + 2] + Math.cos(t * 0.2 + ph0 * 1.3) * 0.7;
       } else {
         // Sparkle — fast jitter, mostly stays put.
         pos[idx + 0] = seed[idx + 0] + Math.sin(t * 1.5 + ph0) * 0.4;
@@ -196,21 +247,40 @@ export function ChapterParticles({ chapterId, w = 16, h = 12 }: { chapterId: str
   const ay = 5;
 
   if (chapterId === "ch12" || chapterId === "ch20") {
-    // Lava / volcanic — heavy embers
+    // Lava / volcanic — heavy embers + ash haze
     return (
       <>
         <AmbientParticles kind="ember" count={140} area={[ax, ay, az]} color="#ff7a30" size={0.22} opacity={0.95} speed={1.4} />
         <AmbientParticles kind="ember" count={70} area={[ax, ay, az]} color="#ffd060" size={0.14} opacity={0.9} speed={1.8} />
+        <AmbientParticles kind="ash" count={80} area={[ax, ay + 1, az]} color="#5a5048" size={0.10} opacity={0.55} speed={0.7} />
         <AmbientParticles kind="dust" count={60} area={[ax, ay, az]} color="#ff5530" opacity={0.4} speed={0.6} />
       </>
     );
   }
-  if (chapterId === "ch14" || chapterId === "ch16" || chapterId === "ch11") {
-    // Frozen / ice / winter — drifting snow-ish dust + sparkles
+  if (chapterId === "ch14" || chapterId === "ch11") {
+    // Frozen lake / mountain pass — heavy snow
+    return (
+      <>
+        <AmbientParticles kind="snow" count={260} area={[ax, ay + 2, az]} color="#f0f8ff" size={0.16} opacity={0.95} speed={0.5} />
+        <AmbientParticles kind="spark" count={60} area={[ax, ay, az]} color="#a0e0ff" size={0.12} opacity={0.85} speed={0.8} />
+      </>
+    );
+  }
+  if (chapterId === "ch16") {
+    // Void gate — drifting cold dust (kept from prior pass)
     return (
       <>
         <AmbientParticles kind="dust" count={180} area={[ax, ay + 2, az]} color="#e8f0ff" size={0.16} opacity={0.7} speed={0.5} />
         <AmbientParticles kind="spark" count={60} area={[ax, ay, az]} color="#a0e0ff" size={0.12} opacity={0.85} speed={0.8} />
+      </>
+    );
+  }
+  if (chapterId === "ch04" || chapterId === "ch06" || chapterId === "ch10") {
+    // Crossroads / city / fall — light rain
+    return (
+      <>
+        <AmbientParticles kind="rain" count={400} area={[ax, ay, az]} color="#b0c4d8" size={0.55} opacity={0.55} speed={1.0} />
+        <AmbientParticles kind="dust" count={50} area={[ax, ay, az]} color="#8090a8" opacity={0.25} speed={0.35} />
       </>
     );
   }
@@ -233,7 +303,17 @@ export function ChapterParticles({ chapterId, w = 16, h = 12 }: { chapterId: str
       </>
     );
   }
-  // Default — ch01..07, ch10, ch15, ch17: dusk / generic
+  if (chapterId === "ch02") {
+    // Forest of whispers — leaves + dust
+    return (
+      <>
+        <AmbientParticles kind="leaf" count={40} area={[ax, ay + 1, az]} color="#9ad86a" size={0.20} opacity={0.75} speed={0.6} />
+        <AmbientParticles kind="dust" count={100} area={[ax, ay, az]} color="#d8d0c0" opacity={0.4} speed={0.35} />
+        <AmbientParticles kind="spark" count={20} area={[ax, ay, az]} color="#fff0c0" size={0.1} opacity={0.6} speed={0.6} />
+      </>
+    );
+  }
+  // Default — ch01, ch03, ch05, ch07, ch15, ch17: dusk / generic
   return (
     <>
       <AmbientParticles kind="dust" count={100} area={[ax, ay, az]} color="#d8d0c0" opacity={0.4} speed={0.35} />

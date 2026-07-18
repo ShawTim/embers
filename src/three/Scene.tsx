@@ -1,4 +1,4 @@
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
 import { useGame } from "../game/store";
@@ -11,6 +11,7 @@ import { getEnvMap, envForChapter } from "./shared/EnvMap";
 import { setTileMaterialChapter } from "./shared/SceneAssets";
 import { updateWindMaterials } from "./shared/WindShader";
 import { updateWaterMaterials } from "./shared/WaterShader";
+import { spawnProjectile, spawnSlashTrail, tickProjectiles, tickSlashTrails } from "./shared/Projectile";
 import { PostFX } from "./PostFX";
 import { ChapterParticles } from "./AmbientParticles";
 import { VolumetricFog } from "./VolumetricFog";
@@ -81,6 +82,7 @@ export function Scene() {
       {units.filter(u => !u.isDead).map(u => <Unit3D key={u.uid} unit={u} />)}
       <CombatEffects effects={hitEffects} onDone={removeHitEffect} />
       <DamageNumbers numbers={damageNumbers} onDone={removeDamageNumber} />
+      <VFXRunner />
       <ShaderAnimationRunner sceneRef={sceneRef} />
       <PostFX />
     </Canvas>
@@ -95,6 +97,39 @@ function ShaderAnimationRunner({ sceneRef }: { sceneRef: React.MutableRefObject<
     const t = state.clock.elapsedTime;
     updateWindMaterials(s, t);
     updateWaterMaterials(s, t);
+  });
+  return null;
+}
+
+// Drain the store's pendingProjectiles / pendingSlashTrails queues once
+// per frame, spawning flight visuals into the live scene and ticking
+// the active registries.  This is the bridge between the combat
+// state machine (which is async) and the render loop (which is rAF).
+function VFXRunner() {
+  const { scene } = useThree();
+  const drainProjectiles = useGame(s => s.drainProjectiles);
+  const drainSlashTrails = useGame(s => s.drainSlashTrails);
+  useFrame((_, delta) => {
+    const projs = drainProjectiles();
+    for (const p of projs) {
+      const start = new THREE.Vector3(p.start[0], p.start[1], p.start[2]);
+      const end = new THREE.Vector3(p.end[0], p.end[1], p.end[2]);
+      spawnProjectile({
+        parent: scene,
+        start,
+        end,
+        color: new THREE.Color(p.color),
+        kind: p.kind as any,
+        duration: p.duration,
+      });
+    }
+    const trails = drainSlashTrails();
+    for (const t of trails) {
+      const at = new THREE.Vector3(t.at[0], t.at[1], t.at[2]);
+      spawnSlashTrail(scene, at, new THREE.Color(t.color), t.duration);
+    }
+    tickProjectiles(delta);
+    tickSlashTrails(delta);
   });
   return null;
 }

@@ -30,7 +30,7 @@ interface GameState {
   objectiveText: string;
   message: string | null;
   lang: Lang;
-  hitEffects: { id: number; position: [number, number, number]; isCrit: boolean }[];
+  hitEffects: { id: number; position: [number, number, number]; isCrit: boolean; weaponType?: string }[];
   damageNumbers: { id: number; position: [number, number, number]; amount: number; isCrit: boolean; isHeal: boolean; isMiss: boolean }[];
   healAuras: { id: number; position: [number, number, number]; born: number }[];
   bloodDecals: { id: number; position: [number, number, number]; born: number }[];
@@ -58,7 +58,7 @@ interface GameState {
   setSelectionMode: (m: SelectionMode) => void;
   showCombatPreview: (a: RuntimeUnit, d: RuntimeUnit) => void;
   clearCombatPreview: () => void;
-  addHitEffect: (p: [number, number, number], crit: boolean) => void;
+  addHitEffect: (p: [number, number, number], crit: boolean, weaponType?: string) => void;
   removeHitEffect: (id: number) => void;
   addHealAura: (p: [number, number, number]) => void;
   removeHealAura: (id: number) => void;
@@ -73,6 +73,13 @@ interface GameState {
   activeDialogue: string | null;
   setDialogue: (id: string | null) => void;
   clearDialogue: () => void;
+  // Projectile queue: the combat flow pushes a spec when the swing
+  // animation reaches "strike" and the renderer drains + spawns the
+  // flight.  Same for slash trails on melee.
+  pendingProjectiles: { id: number; start: [number, number, number]; end: [number, number, number]; kind: string; color: number; duration: number }[];
+  pendingSlashTrails: { id: number; at: [number, number, number]; color: number; duration: number }[];
+  drainProjectiles: () => { id: number; start: [number, number, number]; end: [number, number, number]; kind: string; color: number; duration: number }[];
+  drainSlashTrails: () => { id: number; at: [number, number, number]; color: number; duration: number }[];
   useItemAction: (itemId: string) => void;
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
@@ -80,6 +87,42 @@ interface GameState {
 }
 
 const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+// ---------------------------------------------------------------------------
+//  Per-weapon VFX dispatch.  When a unit attacks, push a projectile spec
+//  (for ranged / magic) or a slash trail (for melee) into the renderer
+//  queue.  The renderer drains + spawns inside its useFrame so the timing
+//  lines up with the swing/strike animation phase in the store.
+// ---------------------------------------------------------------------------
+const PROJ_COLOR: Record<string, number> = {
+  fire: 0xff5530, light: 0xfff5b0, thunder: 0xfff060, dark: 0x8030c0,
+  lance: 0xa0d0ff, axe: 0xff8030, bow: 0xc0a070, staff: 0x3aff8a,
+  wind: 0xa0ffd0, sword: 0xffe080,
+};
+const PROJ_KIND: Record<string, string> = {
+  fire: "fireball", light: "lightning", thunder: "lightning", dark: "dark",
+  lance: "lance", axe: "axe", bow: "arrow", staff: "heal",
+  wind: "ice", sword: "spark",
+};
+function queueProjectileForAttack(set: any, get: any, attacker: any, defender: any) {
+  const wt = attacker.equippedWeapon?.type;
+  if (!wt) return;
+  // Melee weapons fire a slash trail (no flying projectile).
+  if (wt === "sword" || wt === "axe" || wt === "lance") {
+    const color = PROJ_COLOR[wt] ?? 0xffe080;
+    set(s => ({ pendingSlashTrails: [...s.pendingSlashTrails, { id: Date.now() + Math.random(), at: [defender.pos.x, 0.9, defender.pos.y], color, duration: 0.4 }] }));
+    return;
+  }
+  // Ranged / magic fire a projectile from attacker to defender.
+  const kind = PROJ_KIND[wt] ?? "spark";
+  const color = PROJ_COLOR[wt] ?? 0xffffff;
+  set(s => ({ pendingProjectiles: [...s.pendingProjectiles, {
+    id: Date.now() + Math.random(),
+    start: [attacker.pos.x, 1.1, attacker.pos.y],
+    end: [defender.pos.x, 1.0, defender.pos.y],
+    kind, color, duration: 0.45,
+  }] }));
+}
 
 export const useGame = create<GameState>((set, get) => ({
   grid: null, chapter: null, units: [], phase: "player", turn: 1,
@@ -134,7 +177,7 @@ export const useGame = create<GameState>((set, get) => ({
       const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
     }
     const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false } as any);
+    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [] } as any);
   },
 
   selectUnit: (u) => {
@@ -189,10 +232,14 @@ export const useGame = create<GameState>((set, get) => ({
     for (let i = 0; i < rounds.length; i++) {
       const r = rounds[i]; const ic = i > 0; const pf = ic ? "counter_" : "";
       setP(pf + "windup", r.attacker.uid, r.defender.uid, ic); await sleep(350);
-      setP(pf + "strike", r.attacker.uid, r.defender.uid, ic); await sleep(200);
+      setP(pf + "strike", r.attacker.uid, r.defender.uid, ic);
+      // Fire the per-weapon VFX on the strike frame so it lines up
+      // with the visible weapon swing / cast animation.
+      queueProjectileForAttack(set, get, r.attacker, r.defender);
+      await sleep(200);
       if (r.hit) {
         get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ffffff");
-        get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit);
+        get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
         get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
         get().triggerShake(r.crit ? 0.7 : 0.25);
         if (r.crit) get().triggerSlowMo(0.25, 280);
@@ -273,10 +320,13 @@ export const useGame = create<GameState>((set, get) => ({
         for (let i = 0; i < rounds.length; i++) {
           const r = rounds[i]; const ic = i > 0; const pf = ic ? "counter_" : "";
           setP(pf + "windup", r.attacker.uid, r.defender.uid, ic); await sleep(350);
-          setP(pf + "strike", r.attacker.uid, r.defender.uid, ic); await sleep(200);
+          setP(pf + "strike", r.attacker.uid, r.defender.uid, ic);
+          // Per-weapon VFX on the strike frame.
+          queueProjectileForAttack(set, get, r.attacker, r.defender);
+          await sleep(200);
           if (r.hit) {
             get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ff8a5a");
-            get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit);
+            get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
             get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
             get().triggerShake(r.crit ? 0.7 : 0.25);
             if (r.crit) get().triggerSlowMo(0.25, 280);
@@ -313,7 +363,7 @@ export const useGame = create<GameState>((set, get) => ({
   showCombatPreview: (a, d) => { const st = get(); if (!st.grid) return; const p = previewCombat(a, d, st.grid.getTerrain(a.pos), st.grid.getTerrain(d.pos)); set({ combatPreview: { attacker: a, defender: d, preview: p } }); },
   clearCombatPreview: () => set({ combatPreview: null }),
 
-  addHitEffect: (p, crit) => set(s => ({ hitEffects: [...s.hitEffects, { id: Date.now() + Math.random(), position: p, isCrit: crit }] })),
+  addHitEffect: (p, crit, weaponType) => set(s => ({ hitEffects: [...s.hitEffects, { id: Date.now() + Math.random(), position: p, isCrit: crit, weaponType }] })),
   removeHitEffect: (id) => set(s => ({ hitEffects: s.hitEffects.filter(e => e.id !== id) })),
   addHealAura: (p) => set(s => ({ healAuras: [...(s.healAuras || []), { id: Date.now() + Math.random(), position: p, born: performance.now() / 1000 }] })),
   removeHealAura: (id) => set(s => ({ healAuras: (s.healAuras || []).filter(a => a.id !== id) })),
@@ -327,6 +377,10 @@ export const useGame = create<GameState>((set, get) => ({
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),
   clearDialogue: () => set({ activeDialogue: null }),
+  pendingProjectiles: [],
+  pendingSlashTrails: [],
+  drainProjectiles: () => { const q = get().pendingProjectiles; set({ pendingProjectiles: [] }); return q; },
+  drainSlashTrails: () => { const q = get().pendingSlashTrails; set({ pendingSlashTrails: [] }); return q; },
   useItemAction: (itemId) => {
     const st = get(); if (!st.selectedUnit) return;
     const unit = st.selectedUnit;
@@ -378,4 +432,14 @@ function checkBattleEnd(set: any, get: any) {
       set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
     }
   }
+}
+
+// Dev hook — exposes the store + a few helpers on window so the headless
+// verification scripts can drive chapters + combat without replaying the
+// full UI.  Safe to leave in production: it's a thin pointer to the
+// same store the React tree uses.
+if (typeof window !== "undefined") {
+  (window as any).__game = useGame;
+  (window as any).__initChapter = (i: number) => useGame.getState().initChapter(i);
+  (window as any).__endTurn = () => useGame.getState().endPlayerTurn();
 }
