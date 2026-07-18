@@ -269,6 +269,8 @@ export const ch11_pre: DialogueScript = {
     { speaker: "narrator", text: { en: "The Frostpeak Mountains. Cold, barren. The path narrows.", zh: "冰峰山脈。寒冷、荒蕪。道路狹窄。" } },
     { speaker: "darius", text: { en: "The mountain clans are proud and suspicious of lowlanders. We must tread carefully.", zh: "山嶽氏族驕傲且對低地人充滿戒心。我們必須謹慎行事。" }, mood: "neutral" },
     { speaker: "borin", text: { en: "Worse — the cold. Half our supplies are gone. We need shelter by nightfall.", zh: "更糟的是——寒冷。我們一半的補給都沒了。我們需要在日落前找到庇護所。" }, mood: "worried" },
+    { speaker: "kael", text: { en: "Then we move quickly. Light units first. And we pray.", zh: "那我們快走。輕型單位先走。然後我們祈禱。" }, mood: "determined" },
+    { speaker: "lyra", text: { en: "I can feel the corruption in the peaks. The Umbral is closer than we thought.", zh: "我能感覺到山峰中的腐化。永夜比我們想的更近。" }, mood: "worried" },
   ],
 };
 
@@ -314,6 +316,8 @@ export const ch13_pre: DialogueScript = {
     { speaker: "yuki", text: { en: "The clans have told me. Malachar has built a fortress in the old borderlands. The Umbral Fortress.", zh: "氏族已經告訴我了。Malachar 在舊邊境建了一座堡壘。暗影堡壘。" }, mood: "neutral" },
     { speaker: "darius", text: { en: "If he has the Ember shard, he will use it. And if he reaches Zethar...", zh: "如果他有餘燼碎片，他會用它。如果他到達 Zethar 身邊……" }, mood: "worried" },
     { speaker: "kael", text: { en: "We cannot let that happen. We ride for the fortress. Today.", zh: "我們不能讓那發生。我們今天就騎馬去堡壘。" }, mood: "determined" },
+    { speaker: "lyra", text: { en: "The shard feels heavier in my hand the further north we ride. The Ember is warning us.", zh: "我們越往北騎，碎片在我手中越重。餘燼在警告我們。" }, mood: "worried" },
+    { speaker: "maren", text: { en: "Then we move now. Before he finishes whatever he is building.", zh: "那我們現在就行動。在他完成他在建的任何東西之前。" }, mood: "determined" },
   ],
 };
 
@@ -379,6 +383,8 @@ export const ch16_pre: DialogueScript = {
     { speaker: "narrator", text: { en: "The Void Gate. A tear in the world itself, black light spilling through. The Endless Night pours in.", zh: "虛空之門。世界本身的一道裂痕，黑光從中湧出。永夜灌入。" } },
     { speaker: "darius", text: { en: "We must close it. Reach the gate. Whatever the cost.", zh: "我們必須關閉它。到達大門。無論代價如何。" }, mood: "urgent" },
     { speaker: "lyra", text: { en: "The Ember shard reacts. It can seal the gate — if we can reach the heart of it.", zh: "餘燼碎片有反應。如果我們能到達它的核心，它能封印大門。" }, mood: "determined" },
+    { speaker: "kael", text: { en: "Then we make for the heart. Cut through whatever stands in our way.", zh: "那我們就向核心推進。斬斷任何擋在我們面前的東西。" }, mood: "determined" },
+    { speaker: "borin", text: { en: "These are no ordinary soldiers. The void breeds faster than men die.", zh: "這些不是普通士兵。虛空比人類死亡更快地繁殖。" }, mood: "worried" },
   ],
 };
 
@@ -388,6 +394,8 @@ export const ch16_victory: DialogueScript = {
     { speaker: "lyra", text: { en: "The gate is closed. The Endless Night retreats — for now. But the cost...", zh: "大門關上了。永夜撤退了——暫時。但代價……" }, mood: "sad" },
     { speaker: "kael", text: { en: "The Ember shard. You used it.", zh: "餘燼碎片。你用了它。" }, mood: "neutral" },
     { speaker: "lyra", text: { en: "I had to. And the flame... is now in me. I am the Ember's vessel now.", zh: "我必須這樣做。而火焰……現在在我體內。我是餘燼的器皿了。" }, mood: "determined" },
+    { speaker: "borin", text: { en: "The light. It surrounds her. It burns but does not consume.", zh: "光。它包圍著她。它燃燒但並不消耗。" }, mood: "neutral" },
+    { speaker: "darius", text: { en: "Then this is the moment. The Ember has chosen its bearer. And it chose her.", zh: "那這就是那一刻。餘燼選擇了它的承載者。而它選了她。" }, mood: "determined" },
   ],
 };
 

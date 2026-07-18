@@ -140,9 +140,9 @@ export const UNITS: Record<string, UnitDef> = {
   cult_captain: { id: "cult_captain", name: "Cult Captain", desc: "A cult field commander. Experienced, ruthless, and devoted to the cause.", classId: "mercenary", level: 8, faction: "enemy", isBoss: true, growthBonus: { hp: 20, str: 15, def: 10 }, inventory: ["steel_sword"], modelId: "Skeleton_Warrior", portraitColor: "#5a0a0a" },
   traitor_guard: { id: "traitor_guard", name: "Traitor Guard", desc: "A city guard turned traitor. Once a protector, now a blade for the Cult.", classId: "knight", level: 7, faction: "enemy", inventory: ["iron_lance"], modelId: "Skeleton_Warrior", portraitColor: "#5a3a1a" },
   malachar: { id: "malachar", name: "Inquisitor Malachar", desc: "The fallen Throne Guardian. Once the Ember's greatest champion, now its deadliest enemy. He believes the flame is a chain that must be broken.", classId: "knight", level: 12, faction: "enemy", isBoss: true, growthBonus: { hp: 30, str: 20, def: 25, res: 15 }, inventory: ["silver_sword"], modelId: "BlackKnight", portraitColor: "#1a0a1a" },
-  umbral_horror: { id: "umbral_horror", name: "Umbral Horror", desc: "A creature of pure darkness, summoned from the Umbral realm. Mindless and destructive.", classId: "fighter", level: 10, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Minion", portraitColor: "#0a0a1a" },
-  void_wraith: { id: "void_wraith", name: "Void Wraith", desc: "An ethereal being from beyond the Void Gate. Its touch drains the light itself.", classId: "mage", level: 12, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#1a0a2a" },
-  zethar: { id: "zethar", name: "Lord Zethar", desc: "The Endless Night. The first Guardian of the Ember Throne, who turned against the flame when he discovered its terrible truth.", classId: "lord", level: 20, faction: "enemy", isBoss: true, growthBonus: { hp: 40, str: 25, mag: 20, skl: 20, spd: 15, def: 25, res: 25 }, inventory: ["silver_sword"], modelId: "Vampire", portraitColor: "#000010" },
+  umbral_horror: { id: "umbral_horror", name: "Umbral Horror", desc: "A creature of pure darkness, summoned from the Umbral realm. Mindless and destructive.", classId: "fighter", level: 8, faction: "enemy", inventory: ["iron_axe"], modelId: "Skeleton_Minion", portraitColor: "#0a0a1a" },
+  void_wraith: { id: "void_wraith", name: "Void Wraith", desc: "An ethereal being from beyond the Void Gate. Its touch drains the light itself.", classId: "mage", level: 9, faction: "enemy", inventory: ["fire"], modelId: "Skeleton_Mage", portraitColor: "#1a0a2a" },
+  zethar: { id: "zethar", name: "Lord Zethar", desc: "The Endless Night. The first Guardian of the Ember Throne, who turned against the flame when he discovered its terrible truth.", classId: "lord", level: 18, faction: "enemy", isBoss: true, growthBonus: { hp: 40, str: 25, mag: 20, skl: 20, spd: 15, def: 25, res: 25 }, inventory: ["silver_sword"], modelId: "Vampire", portraitColor: "#000010" },
   umbral_dragon: { id: "umbral_dragon", name: "Umbral Dragon", desc: "An ancient wyrm corrupted by the shadow that festers in the mountains. Its breath unmakes the light.", classId: "knight", level: 10, faction: "enemy", isBoss: true, growthBonus: { hp: 60, str: 25, def: 20, res: 25 }, inventory: ["fire"], modelId: "Monstrosity", portraitColor: "#3a0a3a" },
 };
 
@@ -163,7 +163,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch02", name: "Forest of Whispers", desc: "Defeat all enemies", objective: "Defeat all enemies",
     objectiveType: "route", mapSize: { w: 20, h: 15 },
     terrain: { "4,3":"forest","4,4":"forest","4,5":"forest","5,3":"forest","5,4":"forest","6,2":"forest","6,3":"forest","6,11":"forest","7,1":"forest","7,2":"forest","7,12":"forest","9,9":"forest","9,10":"forest","9,11":"forest","11,2":"forest","11,3":"forest","12,11":"forest","12,12":"forest","14,2":"forest","14,12":"forest","14,13":"forest","17,4":"forest","17,10":"forest","3,7":"fort","8,6":"fort","13,7":"fort" },
-    deploymentPoints: [{x:1,y:6},{x:1,y:7},{x:1,y:8},{x:2,y:5},{x:2,y:6},{x:2,y:8},{x:2,y:9}],
+    deploymentPoints: [{x:1,y:4},{x:1,y:6},{x:2,y:5},{x:2,y:7},{x:3,y:4},{x:3,y:8},{x:3,y:6}],
     enemies: [
       {unitId:"bandit_axe",pos:{x:8,y:4},aiType:"aggressive"},{unitId:"bandit_sword",pos:{x:8,y:10},aiType:"aggressive"},
       {unitId:"bandit_axe",pos:{x:10,y:7},aiType:"defensive"},{unitId:"umbral_mage",pos:{x:12,y:5},aiType:"sniper"},
@@ -178,7 +178,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch03", name: "The Forsaken Shrine", desc: "Defeat the cultist leader", objective: "Defeat Veyne",
     objectiveType: "boss", mapSize: { w: 18, h: 12 },
     terrain: { "5,5":"forest","6,5":"forest","7,5":"forest","5,6":"forest","6,6":"forest","7,6":"forest","5,7":"forest","6,7":"forest","7,7":"forest","5,4":"wall","6,4":"wall","7,4":"wall","8,4":"wall","4,4":"wall","9,4":"wall","8,7":"fort","8,8":"fort","11,5":"mountain","12,5":"mountain","12,6":"mountain","13,6":"mountain" },
-    deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:1,y:7},{x:2,y:5},{x:2,y:6},{x:3,y:5}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:5},{x:1,y:8},{x:2,y:4},{x:2,y:6},{x:3,y:4},{x:3,y:7}],
     enemies: [
       {unitId:"cultist",pos:{x:5,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:4},aiType:"aggressive"},
       {unitId:"umbral_mage",pos:{x:8,y:5},aiType:"sniper"},{unitId:"umbral_mage",pos:{x:8,y:7},aiType:"sniper"},
@@ -189,10 +189,10 @@ export const CHAPTERS: ChapterDef[] = [
     reinforcements: [{turn:3,unitId:"cult_archer",pos:{x:16,y:2},aiType:"aggressive"},{turn:4,unitId:"cultist",pos:{x:16,y:10},aiType:"aggressive"}],
   },
   {
-    id: "ch04", name: "Crossroads of Fate", desc: "Hold for 8 turns", objective: "Survive 8 turns",
-    objectiveType: "defend", objectiveTurns: 8, mapSize: { w: 16, h: 10 },
+    id: "ch04", name: "Crossroads of Fate", desc: "Hold for 6 turns", objective: "Survive 6 turns",
+    objectiveType: "defend", objectiveTurns: 6, mapSize: { w: 16, h: 10 },
     terrain: { "5,3":"road","5,4":"road","5,5":"road","5,6":"road","5,7":"road","10,3":"road","10,4":"road","10,5":"road","10,6":"road","10,7":"road" },
-    deploymentPoints: [{x:6,y:3},{x:6,y:4},{x:6,y:5},{x:6,y:6},{x:6,y:7},{x:7,y:5},{x:7,y:6}],
+    deploymentPoints: [{x:5,y:3},{x:5,y:5},{x:5,y:7},{x:6,y:4},{x:6,y:5},{x:6,y:6},{x:7,y:5}],
     enemies: [
       {unitId:"cultist",pos:{x:1,y:1},aiType:"aggressive"},{unitId:"cultist",pos:{x:1,y:3},aiType:"aggressive"},
       {unitId:"cultist",pos:{x:1,y:5},aiType:"aggressive"},{unitId:"cultist",pos:{x:1,y:7},aiType:"aggressive"},
@@ -205,7 +205,7 @@ export const CHAPTERS: ChapterDef[] = [
     objectiveType: "seize", mapSize: { w: 20, h: 10 },
     terrain: { "4,0":"wall","4,1":"wall","4,2":"wall","4,3":"wall","4,6":"wall","4,7":"wall","4,8":"wall","4,9":"wall","15,0":"wall","15,1":"wall","15,2":"wall","15,3":"wall","15,6":"wall","15,7":"wall","15,8":"wall","15,9":"wall" },
     seizeTile: { x: 18, y: 5 },
-    deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:2,y:4},{x:2,y:6},{x:3,y:5},{x:3,y:6}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:5},{x:1,y:7},{x:2,y:4},{x:2,y:5},{x:2,y:6},{x:3,y:5},{x:3,y:6}],
     enemies: [
       {unitId:"cultist",pos:{x:7,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:5},aiType:"aggressive"},
       {unitId:"cultist_heavy",pos:{x:9,y:4},aiType:"defensive"},{unitId:"cultist_heavy",pos:{x:9,y:5},aiType:"defensive"},
@@ -232,7 +232,7 @@ export const CHAPTERS: ChapterDef[] = [
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
     terrain: { "0,0":"wall","17,0":"wall","0,9":"wall","17,9":"wall" },
     seizeTile: { x: 16, y: 4 },
-    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5},{x:4,y:4}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:3},{x:3,y:5},{x:4,y:4}],
     enemies: [
       {unitId:"cultist",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:5,y:7},aiType:"aggressive"},
       {unitId:"cultist",pos:{x:9,y:3},aiType:"aggressive"},{unitId:"cultist",pos:{x:9,y:6},aiType:"aggressive"},
@@ -241,10 +241,10 @@ export const CHAPTERS: ChapterDef[] = [
     ],
   },
   {
-    id: "ch08", name: "The Arena of Kings", desc: "Protect the Council for 10 turns", objective: "Survive 10 turns",
-    objectiveType: "defend", objectiveTurns: 10, mapSize: { w: 16, h: 10 },
+    id: "ch08", name: "The Arena of Kings", desc: "Protect the Council for 7 turns", objective: "Survive 7 turns",
+    objectiveType: "defend", objectiveTurns: 7, mapSize: { w: 16, h: 10 },
     terrain: { "0,0":"wall","15,0":"wall","0,9":"wall","15,9":"wall","7,3":"fort","7,4":"fort","7,5":"fort","7,6":"fort" },
-    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5},{x:4,y:5}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:3},{x:3,y:6},{x:4,y:5}],
     enemies: [
       {unitId:"cultist",pos:{x:10,y:1},aiType:"aggressive"},{unitId:"cultist",pos:{x:10,y:8},aiType:"aggressive"},
       {unitId:"cultist_heavy",pos:{x:11,y:2},aiType:"aggressive"},{unitId:"cultist_heavy",pos:{x:11,y:7},aiType:"aggressive"},
@@ -256,7 +256,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch09", name: "Betrayal at Dawn", desc: "Execute or spare the traitor", objective: "Defeat the traitor",
     objectiveType: "boss", mapSize: { w: 16, h: 10 },
     terrain: { "7,4":"floor","8,4":"floor","7,5":"floor","8,5":"floor" },
-    deploymentPoints: [{x:1,y:1},{x:1,y:3},{x:1,y:5},{x:1,y:7},{x:2,y:1},{x:2,y:9},{x:3,y:4}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:4},{x:1,y:7},{x:2,y:2},{x:2,y:5},{x:2,y:8},{x:3,y:4}],
     enemies: [
       {unitId:"traitor_guard",pos:{x:7,y:2},aiType:"aggressive"},{unitId:"traitor_guard",pos:{x:7,y:7},aiType:"aggressive"},
       {unitId:"traitor_guard",pos:{x:10,y:3},aiType:"aggressive"},{unitId:"traitor_guard",pos:{x:10,y:6},aiType:"aggressive"},
@@ -264,10 +264,10 @@ export const CHAPTERS: ChapterDef[] = [
     ],
   },
   {
-    id: "ch10", name: "The Fall of Valdris", desc: "Defend the Ember Throne", objective: "Survive 12 turns",
-    objectiveType: "defend", objectiveTurns: 12, mapSize: { w: 20, h: 12 },
+    id: "ch10", name: "The Fall of Valdris", desc: "Defend the Ember Throne", objective: "Survive 8 turns",
+    objectiveType: "defend", objectiveTurns: 8, mapSize: { w: 20, h: 12 },
     terrain: { "0,0":"wall","19,0":"wall","0,11":"wall","19,11":"wall","8,5":"fort","8,6":"fort" },
-    deploymentPoints: [{x:7,y:5},{x:7,y:6},{x:7,y:4},{x:7,y:7}],
+    deploymentPoints: [{x:5,y:3},{x:6,y:3},{x:6,y:7},{x:7,y:4},{x:7,y:6},{x:8,y:5},{x:8,y:6}],
     enemies: [
       {unitId:"cultist",pos:{x:1,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:1,y:9},aiType:"aggressive"},
       {unitId:"cultist_heavy",pos:{x:3,y:3},aiType:"aggressive"},{unitId:"cultist_heavy",pos:{x:3,y:8},aiType:"aggressive"},
@@ -283,10 +283,12 @@ export const CHAPTERS: ChapterDef[] = [
     objectiveType: "seize", mapSize: { w: 20, h: 10 },
     terrain: { "0,0":"wall","19,0":"wall","0,9":"wall","19,9":"wall","5,2":"mountain","6,2":"mountain","5,3":"mountain","6,3":"mountain","5,7":"mountain","6,7":"mountain","5,8":"mountain","6,8":"mountain","10,4":"mountain","11,4":"mountain","10,5":"mountain","11,5":"mountain","10,6":"mountain","11,6":"mountain" },
     seizeTile: { x: 18, y: 5 },
-    deploymentPoints: [{x:1,y:1},{x:1,y:4},{x:1,y:7},{x:2,y:4},{x:3,y:2},{x:3,y:7}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:4},{x:1,y:8},{x:2,y:2},{x:2,y:5},{x:3,y:3},{x:3,y:7}],
     enemies: [
       {unitId:"cultist",pos:{x:8,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:8,y:5},aiType:"aggressive"},
       {unitId:"cult_archer",pos:{x:13,y:3},aiType:"sniper"},{unitId:"cult_archer",pos:{x:13,y:6},aiType:"sniper"},
+      {unitId:"cultist",pos:{x:15,y:4},aiType:"aggressive"},{unitId:"cultist",pos:{x:15,y:5},aiType:"aggressive"},
+      {unitId:"cult_archer",pos:{x:17,y:2},aiType:"sniper"},{unitId:"cult_archer",pos:{x:17,y:7},aiType:"sniper"},
     ],
   },
   {
@@ -307,7 +309,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch13", name: "The Pegasus Riders", desc: "Reach the mountain clans", objective: "Defeat all enemies",
     objectiveType: "route", mapSize: { w: 18, h: 12 },
     terrain: { "0,0":"wall","17,0":"wall","0,11":"wall","17,11":"wall","5,2":"mountain","6,2":"mountain","5,9":"mountain","6,9":"mountain" },
-    deploymentPoints: [{x:1,y:1},{x:1,y:5},{x:1,y:9},{x:2,y:5}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:5},{x:1,y:8},{x:2,y:4},{x:2,y:6},{x:3,y:4},{x:3,y:7}],
     enemies: [
       {unitId:"cultist",pos:{x:8,y:3},aiType:"aggressive"},{unitId:"cultist",pos:{x:8,y:8},aiType:"aggressive"},
       {unitId:"cultist_heavy",pos:{x:10,y:4},aiType:"defensive"},{unitId:"cultist_heavy",pos:{x:10,y:7},aiType:"defensive"},
@@ -318,20 +320,40 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: "ch14", name: "The Frozen Lake", desc: "Cross the ice without falling", objective: "Reach the far shore",
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
-    terrain: {}, // All default (water would be here, but simplified)
+    // Water tiles represent the frozen lake.  Shores remain plain so the
+    // player can deploy + rest there safely.  Mountain borders keep the
+    // playable area focused on the crossing.
+    terrain: {
+      "3,2":"water","3,3":"water","3,4":"water","3,5":"water","3,6":"water","3,7":"water",
+      "4,2":"water","4,3":"water","4,4":"water","4,5":"water","4,6":"water","4,7":"water",
+      "5,2":"water","5,3":"water","5,4":"water","5,5":"water","5,6":"water","5,7":"water",
+      "6,2":"water","6,3":"water","6,4":"water","6,5":"water","6,6":"water","6,7":"water",
+      "7,2":"water","7,3":"water","7,4":"water","7,5":"water","7,6":"water","7,7":"water",
+      "8,2":"water","8,3":"water","8,4":"water","8,5":"water","8,6":"water","8,7":"water",
+      "9,2":"water","9,3":"water","9,4":"water","9,5":"water","9,6":"water","9,7":"water",
+      "10,2":"water","10,3":"water","10,4":"water","10,5":"water","10,6":"water","10,7":"water",
+      "11,2":"water","11,3":"water","11,4":"water","11,5":"water","11,6":"water","11,7":"water",
+      "12,2":"water","12,3":"water","12,4":"water","12,5":"water","12,6":"water","12,7":"water",
+      "13,2":"water","13,3":"water","13,4":"water","13,5":"water","13,6":"water","13,7":"water",
+      "14,2":"water","14,3":"water","14,4":"water","14,5":"water","14,6":"water","14,7":"water",
+      "2,0":"mountain","2,1":"mountain","2,8":"mountain","2,9":"mountain",
+      "15,0":"mountain","15,1":"mountain","15,8":"mountain","15,9":"mountain",
+    },
     seizeTile: { x: 16, y: 5 },
     deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:1,y:6},{x:2,y:5}],
     enemies: [
       {unitId:"cultist",pos:{x:7,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:7,y:7},aiType:"aggressive"},
       {unitId:"cultist",pos:{x:10,y:3},aiType:"aggressive"},{unitId:"cultist",pos:{x:10,y:6},aiType:"aggressive"},
       {unitId:"cult_archer",pos:{x:13,y:4},aiType:"sniper"},{unitId:"cult_archer",pos:{x:13,y:5},aiType:"sniper"},
+      {unitId:"cultist",pos:{x:14,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:14,y:7},aiType:"aggressive"},
+      {unitId:"cult_archer",pos:{x:16,y:3},aiType:"sniper"},{unitId:"cult_archer",pos:{x:16,y:6},aiType:"sniper"},
     ],
   },
   {
     id: "ch15", name: "The Umbral Fortress", desc: "Infiltrate and defeat Malachar", objective: "Defeat Malachar",
     objectiveType: "boss", mapSize: { w: 18, h: 12 },
     terrain: { "0,0":"wall","17,0":"wall","0,11":"wall","17,11":"wall","8,5":"fort","8,6":"fort" },
-    deploymentPoints: [{x:1,y:1},{x:1,y:10},{x:2,y:1},{x:2,y:10},{x:3,y:4},{x:3,y:6}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:5},{x:1,y:8},{x:2,y:2},{x:2,y:6},{x:2,y:10},{x:3,y:4},{x:3,y:8}],
     enemies: [
       {unitId:"cultist",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"cultist",pos:{x:5,y:9},aiType:"aggressive"},
       {unitId:"cultist_heavy",pos:{x:7,y:3},aiType:"aggressive"},{unitId:"cultist_heavy",pos:{x:7,y:8},aiType:"aggressive"},
@@ -348,7 +370,7 @@ export const CHAPTERS: ChapterDef[] = [
     objectiveType: "seize", mapSize: { w: 18, h: 10 },
     terrain: { "0,0":"wall","17,0":"wall","0,9":"wall","17,9":"wall" },
     seizeTile: { x: 15, y: 5 },
-    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:2},{x:2,y:7},{x:3,y:3},{x:3,y:6},{x:4,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:6,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:6,y:7},aiType:"aggressive"},
       {unitId:"void_wraith",pos:{x:8,y:4},aiType:"sniper"},{unitId:"void_wraith",pos:{x:8,y:5},aiType:"sniper"},
@@ -362,7 +384,7 @@ export const CHAPTERS: ChapterDef[] = [
     objectiveType: "seize", mapSize: { w: 16, h: 10 },
     terrain: { "0,0":"wall","15,0":"wall","0,9":"wall","15,9":"wall","7,4":"fort","8,4":"fort","7,5":"fort","8,5":"fort" },
     seizeTile: { x: 7, y: 4 },
-    deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:2,y:4},{x:2,y:5}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:6},{x:2,y:4},{x:2,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:5,y:7},aiType:"aggressive"},
       {unitId:"void_wraith",pos:{x:10,y:4},aiType:"sniper"},{unitId:"void_wraith",pos:{x:10,y:5},aiType:"sniper"},
@@ -372,7 +394,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch18", name: "The Lord of Night", desc: "Confront Zethar at the Throne's foundation", objective: "Defeat Zethar",
     objectiveType: "boss", mapSize: { w: 14, h: 10 },
     terrain: { "0,0":"wall","13,0":"wall","0,9":"wall","13,9":"wall","6,3":"floor","7,3":"floor","8,3":"floor","6,4":"floor","7,4":"floor","8,4":"floor","6,5":"floor","7,5":"floor","8,5":"floor","6,6":"floor","7,6":"floor","8,6":"floor" },
-    deploymentPoints: [{x:1,y:4},{x:1,y:5},{x:2,y:4},{x:2,y:5}],
+    deploymentPoints: [{x:1,y:3},{x:1,y:6},{x:2,y:4},{x:2,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:4,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:4,y:7},aiType:"aggressive"},
       {unitId:"void_wraith",pos:{x:5,y:4},aiType:"sniper"},{unitId:"void_wraith",pos:{x:5,y:5},aiType:"sniper"},
@@ -382,8 +404,8 @@ export const CHAPTERS: ChapterDef[] = [
     ],
   },
   {
-    id: "ch19", name: "The Last Ember", desc: "Defend Lyra for 15 turns while she restores the Throne", objective: "Survive 15 turns",
-    objectiveType: "defend", objectiveTurns: 15, mapSize: { w: 16, h: 10 },
+    id: "ch19", name: "The Last Ember", desc: "Defend Lyra for 10 turns while she restores the Throne", objective: "Survive 10 turns",
+    objectiveType: "defend", objectiveTurns: 10, mapSize: { w: 16, h: 10 },
     terrain: { "0,0":"wall","15,0":"wall","0,9":"wall","15,9":"wall","7,4":"fort","8,4":"fort" },
     deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5}],
     enemies: [
@@ -397,7 +419,7 @@ export const CHAPTERS: ChapterDef[] = [
     id: "ch20", name: "Dawn of Aetheria", desc: "Defeat Zethar and choose the world's fate", objective: "Defeat Zethar",
     objectiveType: "boss", mapSize: { w: 16, h: 10 },
     terrain: { "0,0":"wall","15,0":"wall","0,9":"wall","15,9":"wall" },
-    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:1},{x:2,y:8},{x:3,y:4},{x:3,y:5}],
+    deploymentPoints: [{x:1,y:1},{x:1,y:8},{x:2,y:2},{x:2,y:7},{x:3,y:3},{x:3,y:6},{x:4,y:5}],
     enemies: [
       {unitId:"umbral_horror",pos:{x:5,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:5,y:7},aiType:"aggressive"},
       {unitId:"umbral_horror",pos:{x:6,y:2},aiType:"aggressive"},{unitId:"umbral_horror",pos:{x:6,y:7},aiType:"aggressive"},
