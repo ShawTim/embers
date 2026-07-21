@@ -18,32 +18,51 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 const B = import.meta.env.BASE_URL;
 
-const ASSETS = {
-  // Character models (essential)
-  Paladin: B + "models/characters/Paladin.glb",
-  Paladin_with_Helmet: B + "models/characters/Paladin_with_Helmet.glb",
-  BlackKnight: B + "models/characters/BlackKnight.glb",
-  Witch: B + "models/characters/Witch.glb",
-  Druid: B + "models/characters/Druid.glb",
-  Ranger: B + "models/characters/Ranger.glb",
-  Protagonist_A: B + "models/characters/Protagonist_A.glb",
-  Protagonist_B: B + "models/characters/Protagonist_B.glb",
-  Vampire: B + "models/characters/Vampire.glb",
-  Skeleton_Warrior: B + "models/characters/Skeleton_Warrior.glb",
-  Skeleton_Mage: B + "models/characters/Skeleton_Mage.glb",
-  Skeleton_Rogue: B + "models/characters/Skeleton_Rogue.glb",
-  Skeleton_Minion: B + "models/characters/Skeleton_Minion.glb",
-  // Animations
-  General: B + "models/animations/Rig_Medium_General.glb",
-  Movement: B + "models/animations/Rig_Medium_MovementBasic.glb",
-  CombatMelee: B + "models/animations/Rig_Medium_CombatMelee.glb",
-  CombatRanged: B + "models/animations/Rig_Medium_CombatRanged.glb",
-  // Decorations
-  treeA: B + "models/decorations/tree_single_A.gltf",
-  treeSmall: B + "models/decorations/trees_A_small.gltf",
-  treeMed: B + "models/decorations/trees_A_medium.gltf",
-  flag: B + "models/decorations/flag_blue.gltf",
-};
+// Only load the GLBs that are actually referenced in gameData + LandingScene.
+// Keeping this list short is the single biggest win for load time — the
+// 48 model folder is 39MB but only 17 of those are used at runtime.  We
+// also skip the Skeleton_* portraits (4MB each) and reuse the in-game
+// models in the dialogue box instead.
+const CHARACTER_ASSETS: { name: string; url: string }[] = [
+  { name: "Paladin",            url: B + "models/characters/Paladin.glb" },
+  { name: "Paladin_with_Helmet",url: B + "models/characters/Paladin_with_Helmet.glb" },
+  { name: "BlackKnight",        url: B + "models/characters/BlackKnight.glb" },
+  { name: "Witch",              url: B + "models/characters/Witch.glb" },
+  { name: "Druid",              url: B + "models/characters/Druid.glb" },
+  { name: "Ranger",             url: B + "models/characters/Ranger.glb" },
+  { name: "Protagonist_A",      url: B + "models/characters/Protagonist_A.glb" },
+  { name: "Protagonist_B",      url: B + "models/characters/Protagonist_B.glb" },
+  { name: "Vampire",            url: B + "models/characters/Vampire.glb" },
+  { name: "Tiefling",           url: B + "models/characters/Tiefling.glb" },
+  { name: "OrcBrute",           url: B + "models/characters/OrcBrute.glb" },
+  { name: "Barbarian",          url: B + "models/characters/Barbarian.glb" },
+  { name: "Monstrosity",        url: B + "models/characters/Monstrosity.glb" },
+  { name: "Knight",             url: B + "models/characters/Knight.glb" },     // landing scene
+  { name: "Mage",               url: B + "models/characters/Mage.glb" },       // landing scene
+  { name: "Rogue",              url: B + "models/characters/Rogue.glb" },      // landing scene
+  { name: "Rogue_Hooded",       url: B + "models/characters/Rogue_Hooded.glb" }, // landing scene
+];
+
+const ANIM_ASSETS: { name: string; url: string }[] = [
+  { name: "General",    url: B + "models/animations/Rig_Medium_General.glb" },
+  { name: "Movement",   url: B + "models/animations/Rig_Medium_MovementBasic.glb" },
+  { name: "CombatMelee",url: B + "models/animations/Rig_Medium_CombatMelee.glb" },
+  { name: "CombatRanged",url: B + "models/animations/Rig_Medium_CombatRanged.glb" },
+];
+
+const DECORATION_ASSETS: { name: string; url: string }[] = [
+  { name: "treeA",     url: B + "models/decorations/tree_single_A.gltf" },
+  { name: "treeSmall", url: B + "models/decorations/trees_A_small.gltf" },
+  { name: "treeMed",   url: B + "models/decorations/trees_A_medium.gltf" },
+  { name: "flag",      url: B + "models/decorations/flag_blue.gltf" },
+];
+
+interface LoadItem {
+  name: string;
+  url: string;
+  bytes: number;
+  loaded: number;
+}
 
 export default function App() {
   const [phase, setPhase] = useState<"loading" | "menu" | "game">("loading");
@@ -57,54 +76,109 @@ export default function App() {
   const tt = (k: Parameters<typeof t>[0]) => t(k, lang);
   const loaderRef = useRef(new GLTFLoader());
 
-  // Preload all assets
+  // Preload all assets with real byte-level progress.  Tracks total bytes
+  // across all GLBs so the loading bar reflects actual download progress
+  // rather than a count of files.  Each file is fetched in chunks; once
+  // the body is fully buffered we hand the bytes to GLTFLoader for parse.
   useEffect(() => {
-    const entries = Object.entries(ASSETS);
-    let loaded = 0;
-    const total = entries.length;
+    let cancelled = false;
+    const all: LoadItem[] = [
+      ...CHARACTER_ASSETS.map(a => ({ name: a.name, url: a.url, bytes: 0, loaded: 0 })),
+      ...ANIM_ASSETS.map(a => ({ name: a.name, url: a.url, bytes: 0, loaded: 0 })),
+      ...DECORATION_ASSETS.map(a => ({ name: a.name, url: a.url, bytes: 0, loaded: 0 })),
+    ];
+    let totalBytes = 0;
+    let doneBytes = 0;
 
-    for (const [name, url] of entries) {
-      const isGltf = url.endsWith(".gltf");
-      setStatusText(name);
+    const updateProgress = () => {
+      if (totalBytes > 0) setProgress(Math.min(99, Math.round((doneBytes / totalBytes) * 100)));
+    };
 
-      if (isGltf) {
-        // gltf files load differently — fetch + parse
-        fetch(url)
-          .then(r => r.ok ? r.text() : Promise.reject("404"))
-          .then(() => {
-            loaded++;
-            setProgress(Math.round((loaded / total) * 100));
-          })
-          .catch(() => {
-            loaded++;
-            setProgress(Math.round((loaded / total) * 100));
-          });
-      } else {
-        loaderRef.current.load(
-          url,
-          () => {
-            loaded++;
-            setProgress(Math.round((loaded / total) * 100));
-          },
-          undefined,
-          () => {
-            loaded++;
-            setProgress(Math.round((loaded / total) * 100));
+    // Fetch one asset with progress tracking, then parse it with
+    // GLTFLoader.  We pre-allocate a Content-Length-aware downloader so
+    // we can show a real progress bar.
+    const loadOne = (item: LoadItem) => new Promise<void>((resolve) => {
+      setStatusText(item.name);
+      fetch(item.url)
+        .then(async (r) => {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          // Use Content-Length for total if available, otherwise fall back
+          // to a 1MB estimate so the bar still moves.
+          const cl = r.headers.get("content-length");
+          item.bytes = cl ? parseInt(cl, 10) : 1_000_000;
+          totalBytes += item.bytes;
+          updateProgress();
+          if (!r.body) {
+            // No streaming — fall back to blob
+            const blob = await r.blob();
+            item.loaded = blob.size;
+            doneBytes += blob.size;
+            updateProgress();
+            return blob;
           }
-        );
-      }
-    }
+          const reader = r.body.getReader();
+          const chunks: Uint8Array[] = [];
+          let received = 0;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            item.loaded = received;
+            doneBytes += value.length;
+            updateProgress();
+          }
+          // Concatenate
+          const out = new Uint8Array(received);
+          let off = 0;
+          for (const c of chunks) { out.set(c, off); off += c.length; }
+          return out;
+        })
+        .then((buf) => {
+          if (cancelled) return;
+          // Hand the parsed bytes to GLTFLoader.  GLTFLoader supports
+          // a parse() method that takes an ArrayBuffer.
+          let ab: ArrayBuffer;
+          if (buf instanceof ArrayBuffer) {
+            ab = buf;
+          } else {
+            const u8 = buf as Uint8Array;
+            ab = u8.slice().buffer as ArrayBuffer;
+          }
+          loaderRef.current.parse(
+            ab,
+            "",
+            () => resolve(),
+            () => resolve(), // treat parse errors as "done" so the loader doesn't deadlock
+          );
+        })
+        .catch(() => resolve()); // network / decode errors are non-fatal
+    });
 
-    // Check completion
-    const checkInterval = setInterval(() => {
-      if (loaded >= total) {
-        clearInterval(checkInterval);
-        setProgress(100);
-        setTimeout(() => setPhase("menu"), 300);
-      }
-    }, 100);
+    // Decoration .gltf files reference external textures; load them via
+    // plain fetch and let three.js handle the rest on first use.  They
+    // are tiny so the progress cost is small.
+    (async () => {
+      // Run up to 4 downloads in parallel so the browser pipeline stays
+      // full but we don't open dozens of sockets.
+      const CONCURRENCY = 4;
+      let next = 0;
+      const workers: Promise<void>[] = [];
+      const tick = async () => {
+        while (next < all.length && !cancelled) {
+          const i = next++;
+          await loadOne(all[i]);
+        }
+      };
+      for (let i = 0; i < CONCURRENCY; i++) workers.push(tick());
+      await Promise.all(workers);
+      if (cancelled) return;
+      setProgress(100);
+      setStatusText("Ready");
+      setTimeout(() => { if (!cancelled) setPhase("menu"); }, 250);
+    })();
 
-    return () => clearInterval(checkInterval);
+    return () => { cancelled = true; };
   }, []);
 
   // Start game

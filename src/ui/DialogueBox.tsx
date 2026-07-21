@@ -7,16 +7,14 @@ import { audio } from "../audio/engine";
 import { MODEL_PATHS } from "../three/Unit3D";
 import { UNITS } from "../data/gameData";
 
-// Map unit def.id to modelId for portraits
-const UNIT_MODELS: Record<string, string> = {
-  kael: "Paladin", lyra: "Witch", borin: "Paladin_with_Helmet", serra: "Ranger",
-  maren: "Druid", darius: "Protagonist_A", yuki: "Protagonist_B",
-  bandit_sword: "Skeleton_Warrior", bandit_axe: "Barbarian",
-  boss_garrick: "Skeleton_Warrior", umbral_mage: "Skeleton_Mage",
-  cultist: "Skeleton_Warrior", cultist_heavy: "Barbarian", cult_archer: "Skeleton_Rogue",
-  acolyte_veyne: "Skeleton_Mage", cult_captain: "Skeleton_Warrior", traitor_guard: "Skeleton_Warrior",
-  malachar: "BlackKnight", umbral_horror: "Skeleton_Minion", void_wraith: "Skeleton_Mage",
-  zethar: "Vampire", narrator: "",
+// Map unit def.id to modelId for portraits.  By default we use the
+// unit's own modelId from gameData (so we don't need separate
+// "portrait" models), with a few overrides for visual variety when
+// the in-game model is too plain for a close-up.
+const PORTRAIT_OVERRIDES: Record<string, string> = {
+  // Use the in-game model for the main cast.  Enemies use their
+  // in-game model too so we don't need to ship 4MB Skeleton_*.glbs
+  // just for dialogue portraits.
 };
 
 export function DialogueBox() {
@@ -64,10 +62,11 @@ export function DialogueBox() {
   const line: DialogueLine = script.lines[lineIndex];
   const isNarrator = line.speaker === "narrator";
   const speakerDisplayName = isNarrator ? null : (line.speakerName ? line.speakerName[lang] : unitName(line.speaker, lang));
-  const modelId = UNIT_MODELS[line.speaker] || "Knight";
-  // Pull the speaker's portrait color + class title from the unit defs
-  // so the 3D portrait has a coloured "energy" rim and a name plate.
+  // Look up the unit's own modelId so the portrait matches the unit's
+  // appearance on the battlefield.  PORTRAIT_OVERRIDES provides a hook
+  // for swapping to a different model when needed.
   const speakerUnit = UNITS[line.speaker];
+  const modelId = (speakerUnit && (PORTRAIT_OVERRIDES[line.speaker] || speakerUnit.modelId)) || "Paladin";
   const speakerTitle = speakerUnit
     ? t(("c_" + speakerUnit.classId) as any, lang)
     : undefined;

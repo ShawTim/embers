@@ -58,7 +58,9 @@ const MOOD_PRESETS: Record<string, {
 // Animation rig — same as Unit3D.  Keep the portrait model animated so it
 // doesn't stand in T-pose.
 const IDLE_RIG = import.meta.env.BASE_URL + "models/animations/Rig_Medium_General.glb";
-useGLTF.preload(IDLE_RIG);
+// Note: IDLE_RIG is already preloaded by App.tsx as part of the
+// animation rig set. We do not call useGLTF.preload here to avoid
+// duplicate downloads.
 
 export interface PortraitProps {
   modelId: string;

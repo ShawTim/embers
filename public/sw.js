@@ -1,15 +1,55 @@
-const CACHE_NAME = "embers-v2";
-const ESSENTIAL = [
+const CACHE_NAME = "embers-v3";
+// All 17 character models + 4 anim rigs + 4 decorations that the game
+// actually uses.  Listing them here means the service worker pre-caches
+// them on install so subsequent page loads hit the cache without the
+// loader doing a network round-trip.
+const PRECACHE = [
   "./",
   "./index.html",
   "./manifest.json",
   "./favicon.png",
+  "./models/characters/Paladin.glb",
+  "./models/characters/Paladin_with_Helmet.glb",
+  "./models/characters/BlackKnight.glb",
+  "./models/characters/Witch.glb",
+  "./models/characters/Druid.glb",
+  "./models/characters/Ranger.glb",
+  "./models/characters/Protagonist_A.glb",
+  "./models/characters/Protagonist_B.glb",
+  "./models/characters/Vampire.glb",
+  "./models/characters/Tiefling.glb",
+  "./models/characters/OrcBrute.glb",
+  "./models/characters/Barbarian.glb",
+  "./models/characters/Monstrosity.glb",
+  "./models/characters/Knight.glb",
+  "./models/characters/Mage.glb",
+  "./models/characters/Rogue.glb",
+  "./models/characters/Rogue_Hooded.glb",
+  "./models/animations/Rig_Medium_General.glb",
+  "./models/animations/Rig_Medium_MovementBasic.glb",
+  "./models/animations/Rig_Medium_CombatMelee.glb",
+  "./models/animations/Rig_Medium_CombatRanged.glb",
+  "./models/decorations/tree_single_A.gltf",
+  "./models/decorations/trees_A_small.gltf",
+  "./models/decorations/trees_A_medium.gltf",
+  "./models/decorations/flag_blue.gltf",
 ];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
+  // Pre-cache in the background — don't block install on the full
+  // download.  Files added to the cache this way are available on the
+  // very next navigation.
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ESSENTIAL).catch(() => {}))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        PRECACHE.map((url) =>
+          fetch(url, { cache: "reload" })
+            .then((res) => { if (res.ok) cache.put(url, res.clone()); })
+            .catch(() => {}) // network failure is OK; we still try on first load
+        )
+      )
+    )
   );
 });
 

@@ -41,8 +41,10 @@ const ANIM_PATHS = {
   melee: import.meta.env.BASE_URL + "models/animations/Rig_Medium_CombatMelee.glb",
   ranged: import.meta.env.BASE_URL + "models/animations/Rig_Medium_CombatRanged.glb",
 };
-for (const p of Object.values(MODEL_PATHS)) useGLTF.preload(p);
-for (const p of Object.values(ANIM_PATHS)) useGLTF.preload(p);
+// Note: preloading is handled by App.tsx via the loading screen (see
+// the loader at the top of App.tsx). We do NOT call useGLTF.preload
+// here because that would trigger a parallel download of the same
+// files and double the network traffic on first load.
 
 const ANIM = {
   idle: "Idle_A",

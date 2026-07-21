@@ -33,38 +33,27 @@ function orbColorFor(wt: WeaponType | undefined): number {
 
 const B = import.meta.env.BASE_URL;
 export const MODEL_PATHS: Record<string, string> = {
+  // Models used by the main game (see gameData.ts) + landing scene.
+  // Pruned of unused entries (4GTN, FrostGolem, Skeleton_*, etc.) so
+  // the registry stays small and easy to audit.
   Paladin: B + "models/characters/Paladin.glb",
   Paladin_with_Helmet: B + "models/characters/Paladin_with_Helmet.glb",
   BlackKnight: B + "models/characters/BlackKnight.glb",
   Witch: B + "models/characters/Witch.glb",
-  MagicalGirl: B + "models/characters/MagicalGirl.glb",
   Druid: B + "models/characters/Druid.glb",
   Ranger: B + "models/characters/Ranger.glb",
-  Cleric: B + "models/characters/Cleric.glb",
-  Lorekeeper: B + "models/characters/Lorekeeper.glb",
-  Marksman: B + "models/characters/Marksman.glb",
+  Barbarian: B + "models/characters/Barbarian.glb",
+  Protagonist_A: B + "models/characters/Protagonist_A.glb",
+  Protagonist_B: B + "models/characters/Protagonist_B.glb",
+  Vampire: B + "models/characters/Vampire.glb",
+  Tiefling: B + "models/characters/Tiefling.glb",
+  OrcBrute: B + "models/characters/OrcBrute.glb",
+  Monstrosity: B + "models/characters/Monstrosity.glb",
+  // Landing scene models
   Knight: B + "models/characters/Knight.glb",
   Mage: B + "models/characters/Mage.glb",
   Rogue: B + "models/characters/Rogue.glb",
   Rogue_Hooded: B + "models/characters/Rogue_Hooded.glb",
-  Barbarian: B + "models/characters/Barbarian.glb",
-  Protagonist_A: B + "models/characters/Protagonist_A.glb",
-  Protagonist_B: B + "models/characters/Protagonist_B.glb",
-  AvianSwordsman: B + "models/characters/AvianSwordsman.glb",
-  Vampire: B + "models/characters/Vampire.glb",
-  Tiefling: B + "models/characters/Tiefling.glb",
-  OrcBrute: B + "models/characters/OrcBrute.glb",
-  FrostGolem: B + "models/characters/FrostGolem.glb",
-  Monstrosity: B + "models/characters/Monstrosity.glb",
-  CombatMech: B + "models/characters/CombatMech.glb",
-  Werewolf_Man: B + "models/characters/Werewolf_Man.glb",
-  Werewolf_Wolf: B + "models/characters/Werewolf_Wolf.glb",
-  PlantWarrior: B + "models/characters/PlantWarrior.glb",
-  ToySoldier: B + "models/characters/ToySoldier.glb",
-  Skeleton_Warrior: B + "models/characters/Skeleton_Warrior.glb",
-  Skeleton_Mage: B + "models/characters/Skeleton_Mage.glb",
-  Skeleton_Rogue: B + "models/characters/Skeleton_Rogue.glb",
-  Skeleton_Minion: B + "models/characters/Skeleton_Minion.glb",
 };
 export const ANIM_PATHS: Record<string, string> = {
   general: B + "models/animations/Rig_Medium_General.glb",
@@ -72,8 +61,11 @@ export const ANIM_PATHS: Record<string, string> = {
   melee: B + "models/animations/Rig_Medium_CombatMelee.glb",
   ranged: B + "models/animations/Rig_Medium_CombatRanged.glb",
 };
-for (const p of Object.values(MODEL_PATHS)) useGLTF.preload(p);
-for (const p of Object.values(ANIM_PATHS)) useGLTF.preload(p);
+// Note: preloading is handled by App.tsx via the loading screen. We do
+// NOT call useGLTF.preload here because that would trigger a parallel
+// download of the same files and double the network traffic on first
+// load. The three.js cache populated by App's loader is used on first
+// useGLTF() call in the render tree.
 
 const FACTION_COLOR: Record<string, string> = { player: "#3a6ad8", enemy: "#d83a3a", ally: "#3ad83a", neutral: "#d8d83a" };
 const TARGET_HEIGHT = 1.6;
