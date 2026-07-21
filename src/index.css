@@ -689,3 +689,21 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
   85%  { opacity: 0.9; }
   100% { opacity: 0; }
 }
+.stats-panel-exp-bar {
+  width: 100%; height: 6px; background: rgba(0,0,0,0.4);
+  border-radius: 3px; overflow: hidden; margin-top: 6px;
+  position: relative;
+}
+.stats-panel-exp-fill {
+  height: 100%; background: linear-gradient(90deg, #4a6aaa, #6a8acc);
+  border-radius: 3px; transition: width 0.3s;
+}
+.stats-panel-exp-text {
+  position: absolute; right: 4px; top: -2px;
+  font-size: 9px; color: #678; line-height: 10px;
+}
+.stats-panel-promo {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid rgba(60,80,120,0.15);
+  font-size: 12px; font-weight: 600;
+}

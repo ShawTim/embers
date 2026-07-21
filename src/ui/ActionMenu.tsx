@@ -123,6 +123,9 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
   const desc = unit.def.desc || "";
   const unitModelId = (unit as any)._dialogModelId || unit.modelId;
 
+  const expNeeded = 100; // EXP_PER_LEVEL
+  const expPct = Math.min(100, (unit.exp / expNeeded) * 100);
+
   return (
     <>
       <div className="overlay" onClick={onClose} />
@@ -143,6 +146,10 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
             <div className="stats-panel-info">
               <div className="stats-panel-class">{tt("level")}{unit.level} {className(unit.classDef.id, lang)}{unit.classDef.tier === 2 ? " ★" : ""}</div>
               <div className="stats-panel-desc">{desc}</div>
+              <div className="stats-panel-exp-bar">
+                <div className="stats-panel-exp-fill" style={{ width: `${expPct}%` }} />
+                <span className="stats-panel-exp-text">{tt("exp")} {unit.exp}/{expNeeded}</span>
+              </div>
             </div>
           </div>
 
@@ -184,6 +191,18 @@ function StatsOverlay({ unit, lang, onClose }: { unit: RuntimeUnit; lang: Lang; 
               </div>
             ))}
           </div>
+
+          {/* Promotion status */}
+          {unit.faction === "player" && (
+            <div className="stats-panel-promo">
+              {unit.classDef.tier === 2
+                ? <span style={{ color: "#fa6" }}>★ {tt("alreadyPromoted")}</span>
+                : unit.level >= 10
+                  ? <span style={{ color: "#6c6" }}>✓ {tt("promote")} ({tt("level")}10+)</span>
+                  : <span style={{ color: "#556" }}>{tt("cantPromote")} ({tt("level")}{unit.level}/10)</span>
+              }
+            </div>
+          )}
         </div>
       </div>
     </>
