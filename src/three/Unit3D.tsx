@@ -406,12 +406,21 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     // so we don't keep animating dozens of skeletons. The billboard is
     // a coloured circle facing the camera — good enough to read as a
     // "unit" placeholder from across the map.
+    //
+    // We use *true 3D distance* (XZ + Y) rather than horizontal distance
+    // alone, so units directly under the camera don't suddenly pop into
+    // billboard mode as the camera rotates around the map.  Threshold is
+    // raised from 12 to 18 — the model is still cheap enough at this
+    // distance, and avoids a jarring swap mid-orbit.
     if (groupRef.current) {
       const cam = state.camera;
-      const dx = cam.position.x - groupRef.current.position.x;
-      const dz = cam.position.z - groupRef.current.position.z;
-      const dist = Math.hypot(dx, dz);
-      const far = dist > 12;
+      const camPos = cam.position;
+      const uPos = groupRef.current.position;
+      const dx = camPos.x - uPos.x;
+      const dy = camPos.y - 0;  // unit sits on the ground
+      const dz = camPos.z - uPos.z;
+      const dist = Math.hypot(dx, dy, dz);
+      const far = dist > 18;
       if (far !== isFarLod.current) {
         isFarLod.current = far;
         if (modelRef.current) modelRef.current.visible = !far;
@@ -423,7 +432,15 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
         if (billboardRef.current) billboardRef.current.visible = far;
       }
       if (far && billboardRef.current) {
-        billboardRef.current.lookAt(cam.position.x, billboardRef.current.getWorldPosition(new THREE.Vector3()).y, cam.position.z);
+        // Face the camera horizontally so the plane stays readable from
+        // any camera angle (including straight-down).  When the camera is
+        // directly above the unit the forward vector is zero — in that
+        // case fall back to the default orientation.
+        const dx = camPos.x - uPos.x;
+        const dz = camPos.z - uPos.z;
+        if (Math.abs(dx) > 0.01 || Math.abs(dz) > 0.01) {
+          billboardRef.current.lookAt(uPos.x + dx, billboardRef.current.position.y, uPos.z + dz);
+        }
       }
     }
   });

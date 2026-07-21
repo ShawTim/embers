@@ -183,7 +183,13 @@ function PortraitModel({ path, shake }: { path: string; shake: number }) {
       obj.position.y = Math.sin(t * 1.1) * 0.012;
       obj.rotation.y = 0.25 + Math.sin(t * 0.4) * 0.04;
       if (shake > 0) {
-        obj.position.x = (Math.random() - 0.5) * shake;
+        // Continuous shake using sin + cos so the motion is smooth rather
+        // than the frame-by-frame random jump that looks like a seizure.
+        // Anger uses a faster, wider frequency than surprise.
+        const freq = shake > 0.03 ? 28 : 18;
+        obj.position.x = (Math.sin(t * freq) + Math.sin(t * (freq * 1.3) + 1.7)) * shake * 0.5;
+        obj.position.z = (Math.cos(t * (freq * 0.8) + 0.9) - Math.sin(t * freq * 1.7)) * shake * 0.5;
+        obj.rotation.z = Math.sin(t * freq * 1.4) * shake * 0.4;
       }
     }
   });
