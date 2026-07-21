@@ -3,13 +3,13 @@ import { CLASSES, WEAPONS, ITEMS, UNITS, PROMOTIONS } from "./gameData";
 
 const EXP_PER_LEVEL = 100;
 
-export function maybeLevelUp(unit: RuntimeUnit, onLevelUp?: (newLevel: number) => void): { leveledUp: boolean; newLevel: number } {
+export function maybeLevelUp(unit: RuntimeUnit, onLevelUp?: (newLevel: number) => void): { leveledUp: boolean; newLevel: number; statGains: Record<string, number> } {
   let levelsGained = 0;
+  const allGains: Record<string, number> = {};
   while (unit.exp >= EXP_PER_LEVEL && unit.level < 20) {
     unit.exp -= EXP_PER_LEVEL;
     unit.level += 1;
     levelsGained++;
-    // Apply level-up stat growth: class growth % chance per stat
     const classDef = unit.classDef;
     const def = unit.def;
     for (const stat of Object.keys(classDef.base)) {
@@ -18,6 +18,7 @@ export function maybeLevelUp(unit: RuntimeUnit, onLevelUp?: (newLevel: number) =
       const chance = growth + personal;
       if (Math.random() * 100 < chance) {
         unit.stats[stat] = (unit.stats[stat] || 0) + 1;
+        allGains[stat] = (allGains[stat] || 0) + 1;
       }
     }
     // Recompute max HP if HP grew
@@ -28,7 +29,7 @@ export function maybeLevelUp(unit: RuntimeUnit, onLevelUp?: (newLevel: number) =
     }
   }
   if (levelsGained > 0 && onLevelUp) onLevelUp(unit.level);
-  return { leveledUp: levelsGained > 0, newLevel: unit.level };
+  return { leveledUp: levelsGained > 0, newLevel: unit.level, statGains: allGains };
 }
 
 export function createUnit(defId: string, pos: { x: number; y: number }, overrides?: Partial<UnitDef>): RuntimeUnit {

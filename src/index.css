@@ -707,3 +707,55 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
   border-top: 1px solid rgba(60,80,120,0.15);
   font-size: 12px; font-weight: 600;
 }
+
+/* EXP popup */
+.exp-popup-overlay {
+  position: absolute; top: 35%; left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 250; pointer-events: none;
+  animation: expPopupIn 0.3s ease-out;
+}
+@keyframes expPopupIn {
+  from { opacity: 0; transform: translate(-50%, -40%) scale(0.8); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.exp-popup-card {
+  background: linear-gradient(180deg, rgba(12,16,24,0.95) 0%, rgba(8,12,18,0.95) 100%);
+  border: 1px solid rgba(100,140,200,0.4);
+  border-radius: 10px;
+  padding: 16px 24px;
+  text-align: center;
+  min-width: 200px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+.exp-popup-card.levelup {
+  border-color: rgba(255,200,80,0.6);
+  box-shadow: 0 0 24px rgba(255,200,80,0.3), 0 8px 24px rgba(0,0,0,0.5);
+}
+.exp-popup-title {
+  font-size: 18px; font-weight: 800;
+  color: #ffd060; margin-bottom: 6px;
+  text-shadow: 0 0 8px rgba(255,200,80,0.5);
+  letter-spacing: 1px;
+}
+.exp-popup-name {
+  font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px;
+}
+.exp-popup-newlevel {
+  font-size: 14px; color: #6af; font-weight: 700; margin-bottom: 8px;
+}
+.exp-popup-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 4px 16px; margin: 8px 0;
+}
+.exp-popup-stat-gain {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 13px;
+}
+.exp-popup-stat-gain .stat-label { color: #678; }
+.exp-popup-stat-gain .stat-arrow { color: #6c6; font-weight: 700; }
+.exp-popup-stat-gain .stat-plus { color: #6c6; font-weight: 700; }
+.exp-popup-nogain { color: #456; font-size: 13px; }
+.exp-popup-exp {
+  font-size: 14px; color: #8cf; font-weight: 600;
+}

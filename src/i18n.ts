@@ -100,6 +100,7 @@ const STRINGS = {
   logMiss: { en: "{atk} → {def}: Miss!", zh: "{atk} → {def}：未命中！" },
   logHeal: { en: "{healer} heals {target}: +{n} HP", zh: "{healer} 治療 {target}：+{n} 點生命" },
   logLevelUp: { en: "{name} reached Lv {n}!", zh: "{name} 升到 Lv {n}！" },
+  levelUp: { en: "LEVEL UP!", zh: "升級！" },
   logDefeated: { en: "{name} was defeated!", zh: "{name} 被擊敗！" },
   logReinforce: { en: "Reinforcements arrived!", zh: "增援出現！" },
   crit: { en: " CRIT!", zh: " 必殺！" },

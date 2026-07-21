@@ -122,6 +122,9 @@ interface GameState {
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
   addToConvoy: (id: string, type: "weapon" | "item", uses?: number) => void;
+  expPopup: { unitName: string; amount: number; pos: [number, number, number]; leveledUp: boolean; newLevel: number; statGains: Record<string, number> } | null;
+  showExpPopup: (name: string, amount: number, pos: [number, number, number], leveledUp: boolean, newLevel: number, statGains: Record<string, number>) => void;
+  clearExpPopup: () => void;
   // Save / load
   saveToSlot: (slotId: string) => boolean;
   loadFromSlot: (slotId: string) => boolean;
@@ -183,6 +186,7 @@ export const useGame = create<GameState>((set, get) => ({
     { id: "iron_lance", type: "weapon", uses: 45 },
     { id: "master_seal", type: "item", uses: 1 },
   ],
+  expPopup: null,
 
   setLang: (lang) => { if (typeof localStorage !== "undefined") localStorage.setItem("srpg-lang", lang); set({ lang }); },
 
@@ -311,9 +315,19 @@ export const useGame = create<GameState>((set, get) => ({
     if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = atk.equippedWeapon?.type; audio.play("death"); }
     if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); atk._lastKilledByWeapon = target.equippedWeapon?.type; audio.play("death"); }
     if (!atk.isDead) {
-      atk.exp += calculateExp(atk, target, target.isDead);
-      const { leveledUp, newLevel } = maybeLevelUp(atk, (lv) => audio.play("level_up"));
-      if (leveledUp) get().addLog(t("logLevelUp", get().lang, { name: unitName(atk.def.id, get().lang), n: newLevel }), "#ffe070");
+      const expGain = calculateExp(atk, target, target.isDead);
+      atk.exp += expGain;
+      const { leveledUp, newLevel, statGains } = maybeLevelUp(atk, (lv) => audio.play("level_up"));
+      if (leveledUp) {
+        get().addLog(t("logLevelUp", get().lang, { name: unitName(atk.def.id, get().lang), n: newLevel }), "#ffe070");
+        get().showExpPopup(unitName(atk.def.id, get().lang), expGain, [atk.pos.x, 2.5, atk.pos.y], true, newLevel, statGains);
+        await sleep(2500);
+        get().clearExpPopup();
+      } else {
+        get().showExpPopup(unitName(atk.def.id, get().lang), expGain, [atk.pos.x, 2.5, atk.pos.y], false, atk.level, {});
+        await sleep(1500);
+        get().clearExpPopup();
+      }
     }
     atk.hasActed = true;
     set({ phase: "player", selectedUnit: null, pendingMove: null, units: [...g.getAllUnits()], activeCombat: null, combatPhase: null, lastAction: { kind: "attack", targetUid: target.uid } });
@@ -505,6 +519,8 @@ export const useGame = create<GameState>((set, get) => ({
     }
   },
   addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
+  showExpPopup: (name, amount, pos, leveledUp, newLevel, statGains) => set({ expPopup: { unitName: name, amount, pos, leveledUp, newLevel, statGains } }),
+  clearExpPopup: () => set({ expPopup: null }),
 
   saveToSlot: (slotId) => {
     const st = get();
