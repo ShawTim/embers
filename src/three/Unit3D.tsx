@@ -260,9 +260,28 @@ function UnitModel({ unit }: { unit: RuntimeUnit }) {
     return () => clearTimeout(tm);
   } }, [unit.isDead]);
 
-  const onPointerEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; hoverUnit(unit); if (selectionMode === "targeting" && unit.faction !== "player") { const sel = useGame.getState().selectedUnit; if (sel) showCombatPreview(sel, unit); } };
+  const onPointerEnter = (e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; hoverUnit(unit); if (selectionMode === "targeting") { const sel = useGame.getState().selectedUnit; if (sel && (unit.faction !== "player" || sel.equippedWeapon?.type === "staff")) showCombatPreview(sel, unit); } };
   const onPointerLeave = () => { setHovered(false); document.body.style.cursor = "default"; const cur = useGame.getState().hoveredUnit; if (cur === unit) hoverUnit(null); };
-  const onPointerDown = (e: ThreeEvent<PointerEvent>) => { if (e.button !== 0) return; e.stopPropagation(); if (phase !== "player") return; if (selectionMode === "targeting" && unit.faction !== "player") onTileClick(unit.pos); else if (unit.faction === "player" && !unit.hasActed) selectUnit(unit); else hoverUnit(unit); };
+  const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    if (phase !== "player") return;
+    if (selectionMode === "targeting") {
+      // In targeting mode, the click only counts if the unit is a valid
+      // target: enemy for normal weapons, wounded ally for staff.
+      const sel = useGame.getState().selectedUnit;
+      const isStaff = sel?.equippedWeapon?.type === "staff";
+      if (isStaff) {
+        if (unit.faction === "player" && !unit.isDead && unit !== sel) onTileClick(unit.pos);
+        else if (unit.faction !== "player") onTileClick(unit.pos);
+      } else {
+        if (unit.faction !== "player" && !unit.isDead) onTileClick(unit.pos);
+      }
+      return;
+    }
+    if (unit.faction === "player" && !unit.hasActed) selectUnit(unit);
+    else hoverUnit(unit);
+  };
 
   useFrame((state, delta) => {
     const st = useGame.getState();
