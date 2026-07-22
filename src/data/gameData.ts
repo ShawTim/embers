@@ -19,6 +19,7 @@ export const TERRAIN: Record<TerrainType, TerrainDef> = {
   throne:      { type: "throne",      name: "Throne",       defBonus: 3, avoidBonus: 20, healPercent: 10, moveCost: 1, color: "#9a8030" },
   deployment:  { type: "deployment",  name: "Deployment",   defBonus: 0, avoidBonus: 0,  healPercent: 0, moveCost: 1, color: "#3a8a3a" },
   bridge:      { type: "bridge",      name: "Bridge",       defBonus: 0, avoidBonus: 0,  healPercent: 0, moveCost: 1, color: "#7a5e3e" },
+  village:    { type: "village",    name: "Village",      defBonus: 1, avoidBonus: 10, healPercent: 0, moveCost: 1, color: "#8a6a4a" },
 };
 
 export function getMoveCost(terrain: TerrainType, moveType: MoveType): number {
@@ -150,7 +151,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: "ch01", name: "Prologue", desc: "Defeat Garrick", objective: "Defeat Garrick",
     objectiveType: "boss", mapSize: { w: 16, h: 12 },
-    terrain: { "5,2":"forest","5,3":"forest","6,2":"forest","6,3":"forest","11,8":"forest","11,9":"forest","12,8":"forest","12,9":"forest","3,9":"fort","4,9":"fort","2,3":"wall","3,3":"wall","4,3":"wall","0,5":"wall","0,6":"wall","0,7":"wall","0,8":"wall","14,0":"wall","14,1":"wall","14,10":"wall","14,11":"wall" },
+    terrain: { "5,2":"forest","5,3":"forest","6,2":"forest","6,3":"forest","11,8":"forest","11,9":"forest","12,8":"forest","12,9":"forest","3,9":"fort","4,9":"fort","6,5":"village","2,3":"wall","3,3":"wall","4,3":"wall","0,5":"wall","0,6":"wall","0,7":"wall","0,8":"wall","14,0":"wall","14,1":"wall","14,10":"wall","14,11":"wall" },
     deploymentPoints: [{x:1,y:6},{x:1,y:8},{x:2,y:7},{x:3,y:7}],
     enemies: [
       { unitId:"bandit_axe",pos:{x:8,y:3},aiType:"aggressive" },{ unitId:"bandit_axe",pos:{x:10,y:5},aiType:"aggressive" },
@@ -162,7 +163,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: "ch02", name: "Forest of Whispers", desc: "Defeat all enemies", objective: "Defeat all enemies",
     objectiveType: "route", mapSize: { w: 20, h: 15 },
-    terrain: { "4,3":"forest","4,4":"forest","4,5":"forest","5,3":"forest","5,4":"forest","6,2":"forest","6,3":"forest","6,11":"forest","7,1":"forest","7,2":"forest","7,12":"forest","9,9":"forest","9,10":"forest","9,11":"forest","11,2":"forest","11,3":"forest","12,11":"forest","12,12":"forest","14,2":"forest","14,12":"forest","14,13":"forest","17,4":"forest","17,10":"forest","3,7":"fort","8,6":"fort","13,7":"fort" },
+    terrain: { "4,3":"forest","4,4":"forest","4,5":"forest","5,3":"forest","5,4":"forest","6,2":"forest","6,3":"forest","6,11":"forest","7,1":"forest","7,2":"forest","7,12":"forest","9,9":"forest","9,10":"forest","9,11":"forest","11,2":"forest","11,3":"forest","12,11":"forest","12,12":"forest","14,2":"forest","14,12":"forest","14,13":"forest","17,4":"forest","17,10":"forest","3,7":"fort","8,6":"fort","13,7":"fort","10,3":"village" },
     deploymentPoints: [{x:1,y:4},{x:1,y:6},{x:2,y:5},{x:2,y:7},{x:3,y:4},{x:3,y:8},{x:3,y:6}],
     enemies: [
       {unitId:"bandit_axe",pos:{x:8,y:4},aiType:"aggressive"},{unitId:"bandit_sword",pos:{x:8,y:10},aiType:"aggressive"},
@@ -281,7 +282,7 @@ export const CHAPTERS: ChapterDef[] = [
   {
     id: "ch11", name: "Into the Mountains", desc: "Cross the Frostpeak pass", objective: "Reach the far side",
     objectiveType: "seize", mapSize: { w: 20, h: 10 },
-    terrain: { "0,0":"wall","19,0":"wall","0,9":"wall","19,9":"wall","5,2":"mountain","6,2":"mountain","5,3":"mountain","6,3":"mountain","5,7":"mountain","6,7":"mountain","5,8":"mountain","6,8":"mountain","10,4":"mountain","11,4":"mountain","10,5":"mountain","11,5":"mountain","10,6":"mountain","11,6":"mountain" },
+    terrain: { "0,0":"wall","19,0":"wall","0,9":"wall","19,9":"wall","5,2":"mountain","6,2":"mountain","5,3":"mountain","6,3":"mountain","5,7":"mountain","6,7":"mountain","5,8":"mountain","6,8":"mountain","10,4":"mountain","11,4":"mountain","4,3":"village","10,5":"mountain","11,5":"mountain","10,6":"mountain","11,6":"mountain" },
     seizeTile: { x: 18, y: 5 },
     deploymentPoints: [{x:1,y:1},{x:1,y:4},{x:1,y:8},{x:2,y:2},{x:2,y:5},{x:3,y:3},{x:3,y:7}],
     enemies: [

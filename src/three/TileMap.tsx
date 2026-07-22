@@ -28,6 +28,7 @@ const TERRAIN_CFG: Record<string, { height: number; roughness: number; metalness
   throne: { height: 0.2, roughness: 0.4, metalness: 0.3 },
   deployment: { height: 0.1, roughness: 0.95, metalness: 0 },
   bridge: { height: 0.1, roughness: 0.85, metalness: 0 },
+  village: { height: 0.12, roughness: 0.8, metalness: 0 },
 };
 
 const B = import.meta.env.BASE_URL;
@@ -130,6 +131,7 @@ function TileDecorations({ type, height, pos }: { type: string; height: number; 
   if (!models?.length) {
     if (type === "throne") return <group position={[0, height, 0]}><mesh position={[0,0.1,0]} castShadow><boxGeometry args={[0.4,0.2,0.4]} /><meshStandardMaterial color="#8a7020" metalness={0.6} roughness={0.3} /></mesh><mesh position={[0,0.35,-0.15]} castShadow><boxGeometry args={[0.4,0.5,0.1]} /><meshStandardMaterial color="#7a6018" metalness={0.6} roughness={0.3} /></mesh><pointLight position={[0,0.5,0]} color="gold" intensity={0.5} distance={2} /></group>;
     if (type === "bridge") return <group position={[0, height, 0]}>{[0,0.25,-0.25].map((z,i) => <mesh key={i} position={[0,0.005,z]}><boxGeometry args={[0.9,0.02,0.08]} /><meshStandardMaterial color="#6a4e2e" roughness={0.9} /></mesh>)}</group>;
+    if (type === "village") return <group position={[0, height, 0]}><mesh position={[-0.15, 0.15, 0]} castShadow><boxGeometry args={[0.25, 0.3, 0.25]} /><meshStandardMaterial color="#7a5a3a" roughness={0.9} /></mesh><mesh position={[-0.15, 0.36, 0]} castShadow><coneGeometry args={[0.2, 0.15, 4]} /><meshStandardMaterial color="#8a3a2a" roughness={0.8} /></mesh><mesh position={[0.15, 0.12, 0.1]} castShadow><boxGeometry args={[0.2, 0.24, 0.2]} /><meshStandardMaterial color="#6a4a2a" roughness={0.9} /></mesh><mesh position={[0.15, 0.3, 0.1]} castShadow><coneGeometry args={[0.16, 0.12, 4]} /><meshStandardMaterial color="#9a4a3a" roughness={0.8} /></mesh></group>;
     return null;
   }
   const seed = (pos.x * 73 + pos.y * 31) % models.length;

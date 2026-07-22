@@ -4,7 +4,62 @@ import { GameGrid, type Pos, posKey } from "./grid";
 import { createUnit, useItemOnUnit, maybeLevelUp } from "../data/unitFactory";
 import { resolveCombat, calculateExp, type CombatPreview, previewCombat } from "./combat";
 import { decideAIAction, type AIDecision } from "./ai";
-import { CHAPTERS, WEAPONS } from "../data/gameData";
+import { CHAPTERS, WEAPONS, ITEMS } from "../data/gameData";
+
+// Village reward pools per chapter tier
+const VILLAGE_REWARDS: Record<string, string[]> = {
+  ch01: ["vulnerary", "iron_sword"],
+  ch02: ["iron_bow", "heal_staff"],
+  ch03: ["fire", "steel_sword"],
+  ch04: ["iron_lance", "vulnerary"],
+  ch05: ["steel_lance", "iron_axe"],
+  ch06: ["steel_sword", "hand_axe"],
+  ch07: ["fire", "iron_bow"],
+  ch08: ["heal_staff", "vulnerary"],
+  ch09: ["steel_axe", "iron_lance"],
+  ch10: ["silver_sword", "mend_staff"],
+  ch11: ["steel_lance", "iron_bow"],
+  ch12: ["elfire", "killing_edge"],
+  ch13: ["steel_bow", "hand_axe"],
+  ch14: ["silver_lance", "heal_staff"],
+  ch15: ["killer_axe", "physic_staff"],
+  ch16: ["silver_axe", "elfire"],
+  ch17: ["silver_bow", "brave_sword"],
+  ch18: ["nosferatu", "silver_sword"],
+  ch19: ["divinus", "silver_lance"],
+  ch20: ["brave_sword", "fimbulvetr"],
+};
+
+// Chapter completion rewards
+const CHAPTER_REWARDS: Record<string, { weapons: string[]; gold: number }> = {
+  ch01: { weapons: ["steel_sword"], gold: 500 },
+  ch02: { weapons: ["iron_bow", "vulnerary"], gold: 600 },
+  ch03: { weapons: ["fire"], gold: 800 },
+  ch04: { weapons: ["hand_axe"], gold: 700 },
+  ch05: { weapons: ["steel_lance"], gold: 1000 },
+  ch06: { weapons: ["heal_staff"], gold: 1000 },
+  ch07: { weapons: ["javelin"], gold: 1200 },
+  ch08: { weapons: ["lightning"], gold: 1200 },
+  ch09: { weapons: ["killer_axe"], gold: 1500 },
+  ch10: { weapons: ["silver_sword"], gold: 2000 },
+  ch11: { weapons: ["hand_axe"], gold: 1500 },
+  ch12: { weapons: ["elfire"], gold: 2000 },
+  ch13: { weapons: ["steel_bow"], gold: 1800 },
+  ch14: { weapons: ["javelin"], gold: 2000 },
+  ch15: { weapons: ["silver_lance"], gold: 2500 },
+  ch16: { weapons: ["silver_axe"], gold: 2500 },
+  ch17: { weapons: ["divinus"], gold: 3000 },
+  ch18: { weapons: ["brave_sword"], gold: 3000 },
+  ch19: { weapons: ["silver_bow"], gold: 3500 },
+  ch20: { weapons: ["fimbulvetr"], gold: 5000 },
+};
+
+// Weapon drop chances
+const DROP_CHANCE_BOSS = 1.0;
+const DROP_CHANCE_NORMAL = 0.25;
+
+// Track visited villages
+var visitedVillages: Set<string> = new Set();
 import type { Lang } from "../i18n";
 import { t, unitName, chapterInfo } from "../i18n";
 import { getDialogueForTrigger } from "../data/dialogues";
@@ -197,6 +252,7 @@ export const useGame = create<GameState>((set, get) => ({
 
   initChapter: (i) => {
     const ch = CHAPTERS[i]; if (!ch) return;
+    visitedVillages = new Set(); // Reset village state for new chapter
     const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
     for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
     const units: RuntimeUnit[] = [];
@@ -317,8 +373,22 @@ export const useGame = create<GameState>((set, get) => ({
       setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
     }
     setP("exit", "", ""); await sleep(300);
-    if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = atk.equippedWeapon?.type; audio.play("death"); }
-    if (atk.isDead) { g.removeUnit(atk); get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]); atk._lastKilledByWeapon = target.equippedWeapon?.type; audio.play("death"); }
+    if (target.isDead) {
+      g.removeUnit(target);
+      get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a");
+      get().addBloodDecal([target.pos.x, 0.21, target.pos.y]);
+      target._lastKilledByWeapon = atk.equippedWeapon?.type;
+      audio.play("death");
+      // Weapon drop
+      tryWeaponDrop(target, get);
+    }
+    if (atk.isDead) {
+      g.removeUnit(atk);
+      get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a");
+      get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]);
+      atk._lastKilledByWeapon = target.equippedWeapon?.type;
+      audio.play("death");
+    }
     if (!atk.isDead) {
       const expGain = calculateExp(atk, target, target.isDead);
       atk.exp += expGain;
@@ -342,6 +412,7 @@ export const useGame = create<GameState>((set, get) => ({
   waitUnit: () => {
     const st = get(); if (!st.selectedUnit || !st.grid || !st.pendingMove) return;
     const u = st.selectedUnit; st.grid.moveUnit(u, st.pendingMove); u.hasActed = true;
+    tryVillageVisit(u, get);
     set({ selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", units: [...st.grid.getAllUnits()] });
     checkBattleEnd(set, get);
   },
@@ -766,8 +837,57 @@ function checkBattleEnd(set: any, get: any) {
   }
   if (won) {
     saveSystem.markChapterComplete(ch.id);
+    // Chapter completion rewards
+    const reward = CHAPTER_REWARDS[ch.id];
+    if (reward) {
+      for (const wid of reward.weapons) {
+        const w = WEAPONS[wid];
+        if (w) get().addToConvoy(wid, "weapon", w.uses);
+      }
+      get().addLog(t("chapterReward", get().lang, { item: reward.weapons.join(", ") + " + " + reward.gold + "G" }), "#ffcc6a");
+    }
     const vd = getDialogueForTrigger(ch.id, "victory");
     set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+  }
+}
+
+// === Weapon drop system ===
+function tryWeaponDrop(killed: RuntimeUnit, get: any): void {
+  const dropChance = killed.isBoss ? DROP_CHANCE_BOSS : DROP_CHANCE_NORMAL;
+  if (Math.random() > dropChance) return;
+  // Drop the killed unit's equipped weapon
+  const wpn = killed.equippedWeapon;
+  if (!wpn) return;
+  // Only drop if it's a real weapon (not staff or basic bandit weapon)
+  if (wpn.type === "staff") return;
+  get().addToConvoy(wpn.id, "weapon", Math.floor(wpn.uses / 2)); // half used
+  get().addLog(t("itemDrop", get().lang, { item: wpn.name }), "#8cf");
+}
+
+// === Village visit system ===
+function tryVillageVisit(unit: RuntimeUnit, get: any): void {
+  const st: GameState = get();
+  if (!st.chapter) return;
+  if (unit.faction !== "player") return;
+  const villageKey = st.chapter.id + ":" + unit.pos.x + "," + unit.pos.y;
+  if (visitedVillages.has(villageKey)) return;
+  // Check if current tile is "village" terrain
+  const terrain = st.grid?.getTerrain(unit.pos);
+  if (terrain !== "village") return;
+  // Mark visited
+  visitedVillages.add(villageKey);
+  // Give reward
+  const pool = VILLAGE_REWARDS[st.chapter.id];
+  if (!pool || pool.length === 0) return;
+  const rewardId = pool[Math.floor(Math.random() * pool.length)];
+  const w = WEAPONS[rewardId];
+  const i = ITEMS[rewardId];
+  if (w) {
+    get().addToConvoy(rewardId, "weapon", w.uses);
+    get().addLog(t("villageReward", get().lang, { item: w.name }), "#6c6");
+  } else if (i) {
+    get().addToConvoy(rewardId, "item", i.uses);
+    get().addLog(t("villageReward", get().lang, { item: i.name }), "#6c6");
   }
 }
 

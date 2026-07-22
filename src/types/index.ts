@@ -13,7 +13,8 @@ export type MoveType = "infantry" | "armored" | "cavalry" | "flying";
 export type TerrainType =
   | "plain" | "forest" | "mountain" | "fort" | "road"
   | "water" | "deep_water" | "cliff" | "sand" | "thicket"
-  | "floor" | "wall" | "throne" | "deployment" | "bridge";
+  | "floor" | "wall" | "throne" | "deployment" | "bridge"
+  | "village";
 
 export interface TerrainDef {
   type: TerrainType;
