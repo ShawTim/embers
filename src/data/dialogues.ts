@@ -490,10 +490,49 @@ export const ch20_boss_death: DialogueScript = {
   ],
 };
 
+// === Epilogue: ch20 victory → weeks after the dawn ===
+// Multi-line story conclusion: narrator sets the scene, then each
+// surviving main character has a moment that ties up their arc.
 export const ch20_victory: DialogueScript = {
   id: "ch20_victory",
   lines: [
-    { speaker: "narrator", text: { en: "Embers of Aetheria. The story concludes. Thank you for playing.", zh: "艾特利亞餘燼。故事結束。感謝你的遊玩。" } },
+    { speaker: "narrator", text: { en: "Three weeks have passed since the fall of Zethar. The sun has not set once in all that time.", zh: "Zethar 倒台已過了三週。整整三週，太陽未曾落下。" } },
+    { speaker: "narrator", text: { en: "In the restored Temple of Embers, Lyra tends to the god that the world once called silent. He speaks to her now — quietly, kindly, often.", zh: "在修復一新的餘燼神殿中，萊拉照料著那個世界曾以為沉默的神。他如今會同她說話了——輕聲的，溫柔的，時常的。" } },
+    { speaker: "lyra", text: { en: "I never wanted the throne. I just wanted the silence to end. And now it has.", zh: "我從未想要王座。我只是希望沉默結束。如今它結束了。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "Kael returns to Ashwood. The burned estate is being rebuilt — stone by stone, beam by beam. Borin oversees the masons; he has finally taken the hat off.", zh: "凱爾回到 Ashwood。被焚毀的莊園正在重建——一石一石，一梁一梁。波林監督著石匠；終於，他摘下了頭盔。" } },
+    { speaker: "borin", text: { en: "Forty years I've worn a helm in this hall. Today I set it down. The next generation will not need it.", zh: "我在這大廳戴了四十年的頭盔。今天我把它放下。下一代不需要它了。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "Serra is home in the northern forests. The bandits who burned her village are dust. The trees she planted as a girl now stand taller than she is.", zh: "塞拉回到了北方的森林。焚燒她村莊的強盜已成塵土。她少女時種下的樹如今比她更高。" } },
+    { speaker: "serra", text: { en: "I came south to hunt men. I came back to hunt deer. Funny how the world turns.", zh: "我南下是為了獵人。我回來是為了獵鹿。世界真是奇妙。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "Maren takes the chair of High Magus at the restored Academy of Aetheria. Her first act is to open the libraries to every child in the realm, regardless of birth.", zh: "瑪蓮接掌了艾特利亞重建的學院高位大法師之座。她的第一道命令，是將圖書館向全境孩童開放，不問出身。" } },
+    { speaker: "maren", text: { en: "Knowledge kept is knowledge wasted. Let the children burn with it.", zh: "藏起來的知識只是浪費的知識。讓孩子們為它燃燒吧。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "Darius is named Warden of Valdris. The walls he once watched as a guard, he now walks as a lord. Borin weeps at the news. He will not say why.", zh: "達里厄斯被任命為瓦爾德里斯守望者。他曾作為衛兵巡視的城牆，如今以領主之姿行走。波林聞訊落淚。但他不肯說為何。" } },
+    { speaker: "darius", text: { en: "I betrayed the city once. Let me rebuild it twice.", zh: "我曾背叛這城一次。就讓我重建它兩次。" }, mood: "determined" },
+    { speaker: "narrator", text: { en: "Yuki rides the mountain winds again — but now she rides for joy, not for war. The pegasus she lost is buried beneath a cairn of wildflowers at the peak.", zh: "雪姬再次馳騁於山間的風中——但如今她為歡欣而騎，不為戰爭。她失去的飛馬葬於山巔一座野花堆起的石塚下。" } },
+    { speaker: "yuki", text: { en: "She is the wind now. I am the rider. We will never be apart again.", zh: "她如今是風。我是騎者。我們再不會分開。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "And Kael — Kael the Black Knight, Kael of Ashwood, Kael who carried a kingdom on his shoulders — Kael sits on the porch of his rebuilt estate.", zh: "而凱爾——凱爾黑騎士，凱爾·亞什伍德，凱爾曾以一肩扛起王國的——凱爾坐在重建莊園的門廊上。" } },
+    { speaker: "kael", text: { en: "I used to think a lord was measured by the wars he won. I was a fool. A lord is measured by the mornings he gets to keep.", zh: "我曾以為領主的分量以他打過的仗來衡量。我錯了。領主的分量，以他能守住的早晨來衡量。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "A child runs up to him. His own — the first of many. He lifts her onto his knee. The sun is warm. The world is whole.", zh: "一個孩子跑向他。他自己的孩子——許多孩子中的第一個。他將她抱到膝上。陽光溫暖。世界完整。" } },
+    { speaker: "narrator", text: { en: "The story of Embers in the Night has ended. The story of Aetheria is only beginning.", zh: "暗夜餘燼的故事已落幕。艾特利亞的故事，才剛開始。" } },
+  ],
+};
+
+// === Credits roll: cast list with their fates, then "The End" ===
+// Plays AFTER ch20_victory.  Each line is a cast member with a one-line
+// "what happened to them" fate.  The final line is "The End" before
+// the player sees the post-game menu.
+export const ch20_credits: DialogueScript = {
+  id: "ch20_credits",
+  lines: [
+    { speaker: "narrator", text: { en: "And so the cast takes its final bow.", zh: "於是，全體演員迎來了他們的最後謝幕。" } },
+    { speaker: "kael",     text: { en: "Kael of Ashwood — Lord of the Dawn, Father of the New Age.", zh: "凱爾·亞什伍德——黎明領主，新時代之父。" }, mood: "happy" },
+    { speaker: "lyra",     text: { en: "Lyra of the Temple — Voice of the Ember, Healer of the World.", zh: "神殿的萊拉——餘燼之聲，世界之醫。" }, mood: "happy" },
+    { speaker: "borin",    text: { en: "Borin the Veteran — Builder of Ashwood, Keeper of the Hearth.", zh: "老兵波林——亞什伍德的建造者，爐火的守望者。" }, mood: "happy" },
+    { speaker: "serra",    text: { en: "Serra of the North — Warden of the Forest, Hunter of Shadows.", zh: "北方的塞拉——森林守望者，陰影獵手。" }, mood: "happy" },
+    { speaker: "maren",    text: { en: "Maren the Scholar — High Magus of Aetheria, Keeper of the Light.", zh: "學者瑪蓮——艾特利亞大法師，光之守望者。" }, mood: "happy" },
+    { speaker: "darius",   text: { en: "Darius the Twice-Loyal — Warden of Valdris, Redemptor of the Fallen.", zh: "雙忠的達里厄斯——瓦爾德里斯守望者，墮落者的救贖者。" }, mood: "determined" },
+    { speaker: "yuki",     text: { en: "Yuki of the Mountain — Rider of the Wind, Voice of the Sky.", zh: "山之雪姬——風之騎者，天空之聲。" }, mood: "happy" },
+    { speaker: "narrator", text: { en: "In memory of those who fell — Veyne, Garrick, Malachar, Zethar. May they find, in whatever comes after, the peace that eluded them here.", zh: "謹此紀念那些倒下的人——韋恩、加瑞克、馬拉查、澤薩爾。願他們在來世找到此生未能尋得的安寧。" } },
+    { speaker: "narrator", text: { en: "Embers of Aetheria. Written, drawn, played, and loved by you.", zh: "艾特利亞餘燼。由你書寫、描繪、遊玩，與摯愛。" } },
   ],
 };
 export const DIALOGUES: Record<string, DialogueScript> = {
@@ -516,7 +555,7 @@ export const DIALOGUES: Record<string, DialogueScript> = {
   ch17_pre, ch17_victory,
   ch18_pre, ch18_boss_death, ch18_victory,
   ch19_pre, ch19_victory,
-  ch20_pre, ch20_boss_death, ch20_victory,
+  ch20_pre, ch20_boss_death, ch20_victory, ch20_credits,
 };
 
 export function getDialogue(id: string): DialogueScript | null {
@@ -524,7 +563,10 @@ export function getDialogue(id: string): DialogueScript | null {
 }
 
 // === Map chapter + trigger to dialogue id ===
-export function getDialogueForTrigger(chapterId: string, trigger: "pre" | "boss_death" | "victory"): string | null {
+export function getDialogueForTrigger(
+  chapterId: string,
+  trigger: "pre" | "boss_death" | "victory" | "credits",
+): string | null {
   const id = `${chapterId}_${trigger}`;
   return DIALOGUES[id] ? id : null;
 }

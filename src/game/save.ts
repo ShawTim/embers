@@ -47,7 +47,7 @@ export interface SavePayload {
   chapterId: string;
   chapterIndex: number;
   turn: number;
-  phase: "player" | "enemy" | "combat" | "victory" | "defeat";
+  phase: "player" | "enemy" | "combat" | "victory" | "defeat" | "epilogue";
   units: SerializedUnit[];
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
   lang: "en" | "zh";

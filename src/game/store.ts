@@ -29,7 +29,7 @@ function weaponSfxName(w: WeaponType | undefined): string | null {
   }
 }
 
-export type Phase = "player" | "enemy" | "combat" | "victory" | "defeat";
+export type Phase = "player" | "enemy" | "combat" | "victory" | "defeat" | "epilogue";
 export type SelectionMode = "idle" | "moving" | "actionMenu" | "targeting" | "enemyInfo";
 
 interface GameState {
@@ -125,6 +125,11 @@ interface GameState {
   expPopup: { unitName: string; amount: number; pos: [number, number, number]; leveledUp: boolean; newLevel: number; statGains: Record<string, number> } | null;
   showExpPopup: (name: string, amount: number, pos: [number, number, number], leveledUp: boolean, newLevel: number, statGains: Record<string, number>) => void;
   clearExpPopup: () => void;
+  // Epilogue: triggered when the player finishes ch20_credits.  Sets
+  // phase to "epilogue" and shows the OutroOverlay.  From the outro
+  // the player can either return to the title or start a new game.
+  startEpilogue: () => void;
+  returnToTitle: () => void;
   // Save / load
   saveToSlot: (slotId: string) => boolean;
   loadFromSlot: (slotId: string) => boolean;
@@ -458,7 +463,22 @@ export const useGame = create<GameState>((set, get) => ({
   triggerBossEntrance: (name, dur) => set({ bossEntrance: { name, born: performance.now() / 1000, dur } }),
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),
-  clearDialogue: () => set({ activeDialogue: null }),
+  clearDialogue: () => {
+    // If we just finished ch20_victory, automatically chain into
+    // ch20_credits (the cast roll).  If we just finished ch20_credits,
+    // transition to the "epilogue" phase so the OutroOverlay can show.
+    const st = get();
+    const ch = st.chapter;
+    if (ch?.id === "ch20" && st.activeDialogue === "ch20_victory") {
+      set({ activeDialogue: "ch20_credits" });
+      return;
+    }
+    if (ch?.id === "ch20" && st.activeDialogue === "ch20_credits") {
+      set({ activeDialogue: null, phase: "epilogue" });
+      return;
+    }
+    set({ activeDialogue: null });
+  },
   pendingProjectiles: [],
   pendingSlashTrails: [],
   drainProjectiles: () => { const q = get().pendingProjectiles; set({ pendingProjectiles: [] }); return q; },
@@ -521,6 +541,45 @@ export const useGame = create<GameState>((set, get) => ({
   addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
   showExpPopup: (name, amount, pos, leveledUp, newLevel, statGains) => set({ expPopup: { unitName: name, amount, pos, leveledUp, newLevel, statGains } }),
   clearExpPopup: () => set({ expPopup: null }),
+
+  startEpilogue: () => {
+    // Direct entry: clear any active dialogue, jump to epilogue phase.
+    // The OutroOverlay takes over the screen.
+    set({ activeDialogue: null, phase: "epilogue" });
+  },
+  returnToTitle: () => {
+    // Reset the game to the title screen.  Preserves language + audio
+    // settings but discards the in-flight chapter state.
+    set({
+      grid: null,
+      chapter: null,
+      units: [],
+      phase: "player",
+      turn: 1,
+      selectedUnit: null,
+      hoveredUnit: null,
+      hoveredTile: null,
+      moveRange: new Map(),
+      attackRange: [],
+      selectionMode: "idle",
+      pendingMove: null,
+      combatPreview: null,
+      combatLog: [],
+      message: null,
+      hitEffects: [],
+      damageNumbers: [],
+      healAuras: [],
+      bloodDecals: [],
+      screenShake: 0,
+      timeScale: 1,
+      slowMoUntil: 0,
+      bossEntrance: null,
+      activeCombat: null,
+      combatPhase: null,
+      activeDialogue: null,
+      expPopup: null,
+    } as any);
+  },
 
   saveToSlot: (slotId) => {
     const st = get();
