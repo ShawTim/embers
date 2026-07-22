@@ -849,3 +849,36 @@ body { overflow: hidden; background: #0a0e14; font-family: "SF Pro Display", -ap
   background: linear-gradient(180deg, #6040a0 0%, #403070 100%);
   box-shadow: 0 0 16px rgba(128,80,192,0.4);
 }
+
+/* OutroOverlay — final cinematic screen at end of ch20 epilogue */
+.outro-overlay {
+  font-family: "Cinzel", "Trajan Pro", "Times New Roman", serif;
+}
+.outro-btn {
+  background: linear-gradient(180deg, #2a4a7a, #1a3050);
+  border: 1px solid #4a7aaa;
+  color: #e0e8f8;
+  padding: 12px 32px;
+  font-size: 15px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.outro-btn:hover {
+  background: linear-gradient(180deg, #3a5a8a, #2a4060);
+  box-shadow: 0 0 16px rgba(120, 160, 220, 0.4);
+  transform: translateY(-1px);
+}
+.outro-btn-primary {
+  background: linear-gradient(180deg, #d8a55f, #a07838);
+  border-color: #ffd088;
+  color: #1a0a0a;
+  font-weight: 600;
+}
+.outro-btn-primary:hover {
+  background: linear-gradient(180deg, #f0b870, #b88848);
+  box-shadow: 0 0 24px rgba(255, 208, 136, 0.6);
+}

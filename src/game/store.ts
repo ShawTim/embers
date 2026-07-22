@@ -7,20 +7,65 @@ import { decideAIAction, type AIDecision } from "./ai";
 import { CHAPTERS, WEAPONS, ITEMS } from "../data/gameData";
 
 // Village reward pools per chapter tier
+// Shop items available between chapters
+const SHOP_ITEMS: { id: string; price: number }[] = [
+  { id: "vulnerary", price: 150 },
+  { id: "elixir", price: 800 },
+  { id: "master_seal", price: 3000 },
+  { id: "str_ring", price: 2000 },
+  { id: "spd_ring", price: 2000 },
+  { id: "def_ring", price: 2000 },
+  { id: "iron_sword", price: 200 },
+  { id: "steel_sword", price: 500 },
+  { id: "iron_lance", price: 200 },
+  { id: "steel_lance", price: 500 },
+  { id: "iron_axe", price: 200 },
+  { id: "iron_bow", price: 250 },
+  { id: "fire", price: 400 },
+  { id: "heal_staff", price: 400 },
+  { id: "hand_axe", price: 300 },
+  { id: "javelin", price: 350 },
+];
+
+// Chapter completion rewards — only UPGRADE weapons (no Iron tier)
+const CHAPTER_REWARDS: Record<string, { weapons: string[]; gold: number }> = {
+  ch01: { weapons: ["steel_sword"], gold: 500 },
+  ch02: { weapons: ["steel_bow"], gold: 600 },
+  ch03: { weapons: ["elfire"], gold: 800 },
+  ch04: { weapons: ["hand_axe"], gold: 700 },
+  ch05: { weapons: ["steel_lance", "killing_edge"], gold: 1000 },
+  ch06: { weapons: ["mend_staff"], gold: 1000 },
+  ch07: { weapons: ["javelin"], gold: 1200 },
+  ch08: { weapons: ["lightning", "silver_sword"], gold: 1200 },
+  ch09: { weapons: ["killer_axe"], gold: 1500 },
+  ch10: { weapons: ["silver_lance", "silver_bow"], gold: 2000 },
+  ch11: { weapons: ["silver_axe"], gold: 1500 },
+  ch12: { weapons: ["elfire", "brave_sword"], gold: 2000 },
+  ch13: { weapons: ["silver_bow"], gold: 1800 },
+  ch14: { weapons: ["javelin", "nosferatu"], gold: 2000 },
+  ch15: { weapons: ["silver_lance", "silver_axe"], gold: 2500 },
+  ch16: { weapons: ["silver_sword", "fimbulvetr"], gold: 2500 },
+  ch17: { weapons: ["divinus"], gold: 3000 },
+  ch18: { weapons: ["brave_sword", "silver_bow"], gold: 3000 },
+  ch19: { weapons: ["fimbulvetr", "silver_lance"], gold: 3500 },
+  ch20: { weapons: ["fimbulvetr", "brave_sword"], gold: 5000 },
+};
+
+// Village rewards — only useful upgrades
 const VILLAGE_REWARDS: Record<string, string[]> = {
-  ch01: ["vulnerary", "iron_sword"],
-  ch02: ["iron_bow", "heal_staff"],
-  ch03: ["fire", "steel_sword"],
-  ch04: ["iron_lance", "vulnerary"],
-  ch05: ["steel_lance", "iron_axe"],
-  ch06: ["steel_sword", "hand_axe"],
-  ch07: ["fire", "iron_bow"],
-  ch08: ["heal_staff", "vulnerary"],
-  ch09: ["steel_axe", "iron_lance"],
+  ch01: ["vulnerary", "steel_sword"],
+  ch02: ["steel_bow", "heal_staff"],
+  ch03: ["elfire", "steel_sword"],
+  ch04: ["javelin", "vulnerary"],
+  ch05: ["steel_lance", "hand_axe"],
+  ch06: ["killing_edge", "hand_axe"],
+  ch07: ["elfire", "steel_bow"],
+  ch08: ["mend_staff", "lightning"],
+  ch09: ["killer_axe", "silver_sword"],
   ch10: ["silver_sword", "mend_staff"],
-  ch11: ["steel_lance", "iron_bow"],
+  ch11: ["steel_lance", "steel_bow"],
   ch12: ["elfire", "killing_edge"],
-  ch13: ["steel_bow", "hand_axe"],
+  ch13: ["silver_bow", "hand_axe"],
   ch14: ["silver_lance", "heal_staff"],
   ch15: ["killer_axe", "physic_staff"],
   ch16: ["silver_axe", "elfire"],
@@ -30,33 +75,12 @@ const VILLAGE_REWARDS: Record<string, string[]> = {
   ch20: ["brave_sword", "fimbulvetr"],
 };
 
-// Chapter completion rewards
-const CHAPTER_REWARDS: Record<string, { weapons: string[]; gold: number }> = {
-  ch01: { weapons: ["steel_sword"], gold: 500 },
-  ch02: { weapons: ["iron_bow", "vulnerary"], gold: 600 },
-  ch03: { weapons: ["fire"], gold: 800 },
-  ch04: { weapons: ["hand_axe"], gold: 700 },
-  ch05: { weapons: ["steel_lance"], gold: 1000 },
-  ch06: { weapons: ["heal_staff"], gold: 1000 },
-  ch07: { weapons: ["javelin"], gold: 1200 },
-  ch08: { weapons: ["lightning"], gold: 1200 },
-  ch09: { weapons: ["killer_axe"], gold: 1500 },
-  ch10: { weapons: ["silver_sword"], gold: 2000 },
-  ch11: { weapons: ["hand_axe"], gold: 1500 },
-  ch12: { weapons: ["elfire"], gold: 2000 },
-  ch13: { weapons: ["steel_bow"], gold: 1800 },
-  ch14: { weapons: ["javelin"], gold: 2000 },
-  ch15: { weapons: ["silver_lance"], gold: 2500 },
-  ch16: { weapons: ["silver_axe"], gold: 2500 },
-  ch17: { weapons: ["divinus"], gold: 3000 },
-  ch18: { weapons: ["brave_sword"], gold: 3000 },
-  ch19: { weapons: ["silver_bow"], gold: 3500 },
-  ch20: { weapons: ["fimbulvetr"], gold: 5000 },
-};
-
 // Weapon drop chances
 const DROP_CHANCE_BOSS = 1.0;
-const DROP_CHANCE_NORMAL = 0.25;
+const DROP_CHANCE_NORMAL = 0.15;
+
+// Iron-tier weapons that should NOT drop (useless duplicates)
+const BASIC_WEAPONS = new Set(["iron_sword", "iron_lance", "iron_axe", "iron_bow", "fire", "heal_staff", "slim_sword", "slim_lance", "short_bow"]);
 
 // Track visited villages
 var visitedVillages: Set<string> = new Set();
@@ -93,6 +117,7 @@ interface GameState {
   units: RuntimeUnit[];
   phase: Phase;
   turn: number;
+  gold: number;
   selectedUnit: RuntimeUnit | null;
   hoveredUnit: RuntimeUnit | null;
   hoveredTile: Pos | null;
@@ -177,6 +202,7 @@ interface GameState {
   equipWeaponAction: (weaponIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
   addToConvoy: (id: string, type: "weapon" | "item", uses?: number) => void;
+  buyItem: (itemId: string) => boolean;
   expPopup: { unitName: string; amount: number; pos: [number, number, number]; leveledUp: boolean; newLevel: number; statGains: Record<string, number> } | null;
   showExpPopup: (name: string, amount: number, pos: [number, number, number], leveledUp: boolean, newLevel: number, statGains: Record<string, number>) => void;
   clearExpPopup: () => void;
@@ -232,7 +258,7 @@ function queueProjectileForAttack(set: (fn: (s: any) => any) => void, get: () =>
 }
 
 export const useGame = create<GameState>((set, get) => ({
-  grid: null, chapter: null, units: [], phase: "player", turn: 1,
+  grid: null, chapter: null, units: [], phase: "player", turn: 1, gold: 0,
   selectedUnit: null, hoveredUnit: null, hoveredTile: null,
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
@@ -610,6 +636,18 @@ export const useGame = create<GameState>((set, get) => ({
     }
   },
   addToConvoy: (id, type, uses) => set(s => ({ convoy: [...s.convoy, { id, type, uses: uses || 1 }] })),
+  buyItem: (itemId) => {
+    const st = get();
+    const shopItem = SHOP_ITEMS.find(s => s.id === itemId);
+    if (!shopItem) return false;
+    if (st.gold < shopItem.price) return false;
+    const w = WEAPONS[itemId];
+    const i = ITEMS[itemId];
+    if (w) get().addToConvoy(itemId, "weapon", w.uses);
+    else if (i) get().addToConvoy(itemId, "item", i.uses);
+    set({ gold: st.gold - shopItem.price });
+    return true;
+  },
   showExpPopup: (name, amount, pos, leveledUp, newLevel, statGains) => set({ expPopup: { unitName: name, amount, pos, leveledUp, newLevel, statGains } }),
   clearExpPopup: () => set({ expPopup: null }),
 
@@ -845,6 +883,7 @@ function checkBattleEnd(set: any, get: any) {
         if (w) get().addToConvoy(wid, "weapon", w.uses);
       }
       get().addLog(t("chapterReward", get().lang, { item: reward.weapons.join(", ") + " + " + reward.gold + "G" }), "#ffcc6a");
+      set({ gold: (get().gold || 0) + reward.gold });
     }
     const vd = getDialogueForTrigger(ch.id, "victory");
     set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
@@ -855,14 +894,20 @@ function checkBattleEnd(set: any, get: any) {
 function tryWeaponDrop(killed: RuntimeUnit, get: any): void {
   const dropChance = killed.isBoss ? DROP_CHANCE_BOSS : DROP_CHANCE_NORMAL;
   if (Math.random() > dropChance) return;
-  // Drop the killed unit's equipped weapon
   const wpn = killed.equippedWeapon;
-  if (!wpn) return;
-  // Only drop if it's a real weapon (not staff or basic bandit weapon)
-  if (wpn.type === "staff") return;
-  get().addToConvoy(wpn.id, "weapon", Math.floor(wpn.uses / 2)); // half used
-  get().addLog(t("itemDrop", get().lang, { item: wpn.name }), "#8cf");
+  if (!wpn || wpn.type === "staff") return;
+  if (BASIC_WEAPONS.has(wpn.id)) {
+    get().addLog(t("itemDrop", get().lang, { item: "50G" }) as any, "#ffd060");
+    const g = get() as any;
+    g.gold = (g.gold || 0) + 50;
+    useGame.setState({ gold: g.gold });
+    return;
+  }
+  get().addToConvoy(wpn.id, "weapon", wpn.uses);
+  get().addLog(t("itemDrop", get().lang, { item: wpn.name }) as any, "#8cf");
 }
+
+// Village visit
 
 // === Village visit system ===
 function tryVillageVisit(unit: RuntimeUnit, get: any): void {
@@ -871,12 +916,9 @@ function tryVillageVisit(unit: RuntimeUnit, get: any): void {
   if (unit.faction !== "player") return;
   const villageKey = st.chapter.id + ":" + unit.pos.x + "," + unit.pos.y;
   if (visitedVillages.has(villageKey)) return;
-  // Check if current tile is "village" terrain
   const terrain = st.grid?.getTerrain(unit.pos);
   if (terrain !== "village") return;
-  // Mark visited
   visitedVillages.add(villageKey);
-  // Give reward
   const pool = VILLAGE_REWARDS[st.chapter.id];
   if (!pool || pool.length === 0) return;
   const rewardId = pool[Math.floor(Math.random() * pool.length)];
@@ -890,6 +932,11 @@ function tryVillageVisit(unit: RuntimeUnit, get: any): void {
     get().addLog(t("villageReward", get().lang, { item: i.name }), "#6c6");
   }
 }
+
+// Gold helpers
+
+// Export shop data for UI
+export function getShopItems() { return SHOP_ITEMS; }
 
 // Dev hook — exposes the store + a few helpers on window so the headless
 // verification scripts can drive chapters + combat without replaying the
