@@ -190,6 +190,10 @@ const STRINGS = {
   convoy: { en: "Convoy", zh: "倉庫" },
   equipped: { en: "Equipped", zh: "裝備中" },
   promote: { en: "Promote", zh: "轉職" },
+  newWeapons: { en: "New weapons", zh: "新武器" },
+  moveUp: { en: "Movement", zh: "移動力" },
+  fullHeal: { en: "Full HP restore", zh: "完全恢復" },
+  confirmPromote: { en: "Confirm Promotion", zh: "確認轉職" },
   cantPromote: { en: "Requires Lv10+", zh: "需要等級10+" },
   alreadyPromoted: { en: "Already promoted", zh: "已轉職" },
 };

@@ -5,6 +5,7 @@ import { LandingScene } from "./three/LandingScene";
 import { HUD } from "./ui/HUD";
 import { DialogueBox } from "./ui/DialogueBox";
 import { ExpPopup } from "./ui/ExpPopup";
+import { PromotionScreen } from "./ui/PromotionScreen";
 import { BossEntrance } from "./ui/BossEntrance";
 import { CritFlash } from "./ui/CritFlash";
 import { ChapterIntroCard } from "./ui/ChapterIntroCard";
@@ -261,6 +262,7 @@ export default function App() {
       <HUD />
       <DialogueBox />
       <ExpPopup />
+      <PromotionScreen />
       <BossEntrance />
       <CritFlash />
       {chapter?.id && <ChapterIntroCard chapterId={chapter.id} />}
