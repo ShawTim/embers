@@ -65,7 +65,7 @@ function UnitCard({ unit, lang }: { unit: RuntimeUnit; lang: "en" | "zh" }) {
           {wpn && (
             <div className="unit-card-weapon">
               {tt("equipped")}: {wpn.name}<br/>
-              {tt("might")}{wpn.might} · {tt("hit")}{wpn.hit}% · {tt("weight")}{wpn.weight}
+              {wpn.uses} {tt("uses")} · {tt("might")}{wpn.might} · {tt("hit")}{wpn.hit}% · {tt("weight")}{wpn.weight}
               {wpn.crit > 0 ? ` · ${tt("crt")}${wpn.crit}%` : ""}
               {wpn.minRange !== 1 || wpn.maxRange !== 1 ? ` · ${tt("range")}${wpn.minRange}-${wpn.maxRange}` : ""}
             </div>
@@ -75,7 +75,7 @@ function UnitCard({ unit, lang }: { unit: RuntimeUnit; lang: "en" | "zh" }) {
             <div className="unit-card-weapons-list">
               {unit.weapons.map((w, i) => (
                 <div key={i} className="unit-card-weapon-item" style={w === unit.equippedWeapon ? { color: "#6c6" } : {}}>
-                  {w === unit.equippedWeapon ? "✓ " : ""}{w.name}
+                  {w === unit.equippedWeapon ? "✓ " : ""}{w.name} · {w.uses} {tt("uses")}
                 </div>
               ))}
             </div>

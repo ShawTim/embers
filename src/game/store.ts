@@ -2,9 +2,24 @@ import { create } from "zustand";
 import type { RuntimeUnit } from "../types";
 import { GameGrid, type Pos, posKey } from "./grid";
 import { createUnit, useItemOnUnit, maybeLevelUp } from "../data/unitFactory";
-import { resolveCombat, calculateExp, type CombatPreview, previewCombat } from "./combat";
+import {
+  calculateExp,
+  consumeEquippedWeaponUse,
+  previewCombat,
+  removeBrokenWeapons,
+  resolveCombat,
+  type BrokenWeapon,
+  type CombatPreview,
+} from "./combat";
 import { decideAIAction, type AIDecision } from "./ai";
 import { CHAPTERS, WEAPONS, ITEMS } from "../data/gameData";
+import {
+  PLAYER_IDS_BY_CHAPTER,
+  createCampaignRuntimeUnit,
+  snapshotCampaignUnit,
+  syncCampaignRoster,
+  type CampaignRoster,
+} from "./campaign";
 
 // Village reward pools per chapter tier
 // Shop items available between chapters
@@ -82,14 +97,29 @@ const DROP_CHANCE_NORMAL = 0.15;
 // Iron-tier weapons that should NOT drop (useless duplicates)
 const BASIC_WEAPONS = new Set(["iron_sword", "iron_lance", "iron_axe", "iron_bow", "fire", "heal_staff", "slim_sword", "slim_lance", "short_bow"]);
 
+function createInitialConvoy() {
+  return [
+    { id: "vulnerary", type: "item" as const, uses: 3 },
+    { id: "vulnerary", type: "item" as const, uses: 3 },
+    { id: "iron_sword", type: "weapon" as const, uses: 45 },
+    { id: "iron_lance", type: "weapon" as const, uses: 45 },
+    { id: "master_seal", type: "item" as const, uses: 1 },
+  ];
+}
+
 // Track visited villages
 var visitedVillages: Set<string> = new Set();
 import type { Lang } from "../i18n";
 import { t, unitName, chapterInfo } from "../i18n";
 import { getDialogueForTrigger } from "../data/dialogues";
 import { audio } from "../audio/engine";
-import type { WeaponType, WeaponDef } from "../types";
-import { save as saveSystem, type SavePayload, type SerializedUnit } from "./save";
+import type { WeaponType } from "../types";
+import {
+  save as saveSystem,
+  serializeRuntimeUnit,
+  type SavePayload,
+  type SaveWritePayload,
+} from "./save";
 
 function weaponSfxName(w: WeaponType | undefined): string | null {
   if (!w) return "hit_sword";
@@ -118,6 +148,7 @@ interface GameState {
   phase: Phase;
   turn: number;
   gold: number;
+  campaignRoster: CampaignRoster;
   selectedUnit: RuntimeUnit | null;
   hoveredUnit: RuntimeUnit | null;
   hoveredTile: Pos | null;
@@ -143,6 +174,8 @@ interface GameState {
 
   setLang: (lang: Lang) => void;
   initChapter: (i: number) => void;
+  startNewCampaign: () => void;
+  startNextChapter: () => void;
   selectUnit: (u: RuntimeUnit) => void;
   deselectUnit: () => void;
   hoverTile: (p: Pos | null) => void;
@@ -171,6 +204,8 @@ interface GameState {
   triggerBossEntrance: (name: string, dur: number) => void;
   addLog: (text: string, color?: string) => void;
   activeDialogue: string | null;
+  bossDeathDialogueComplete: boolean;
+  victoryResolved: boolean;
   setDialogue: (id: string | null) => void;
   clearDialogue: () => void;
   // Crit events: increment a counter so React components can show a
@@ -198,8 +233,9 @@ interface GameState {
   // timestamp so the camera can decay out.
   chapterIntro: { chapterId: string; born: number } | null;
   triggerChapterIntro: (chapterId: string) => void;
-  useItemAction: (itemId: string) => void;
+  useItemAction: (itemId: string, unitUid?: string) => void;
   equipWeaponAction: (weaponIndex: number) => void;
+  equipConvoyWeaponAction: (convoyIndex: number) => void;
   convoy: { id: string; type: "weapon" | "item"; uses: number }[];
   addToConvoy: (id: string, type: "weapon" | "item", uses?: number) => void;
   buyItem: (itemId: string) => boolean;
@@ -237,8 +273,13 @@ const PROJ_KIND: Record<string, string> = {
   lance: "lance", axe: "axe", bow: "arrow", staff: "heal",
   wind: "ice", sword: "spark",
 };
-function queueProjectileForAttack(set: (fn: (s: any) => any) => void, get: () => any, attacker: any, defender: any) {
-  const wt = attacker.equippedWeapon?.type;
+function queueProjectileForAttack(
+  set: (fn: (s: any) => any) => void,
+  attacker: RuntimeUnit,
+  defender: RuntimeUnit,
+  weaponType?: WeaponType,
+) {
+  const wt = weaponType || attacker.equippedWeapon?.type;
   if (!wt) return;
   // Melee weapons fire a slash trail (no flying projectile).
   if (wt === "sword" || wt === "axe" || wt === "lance") {
@@ -257,62 +298,63 @@ function queueProjectileForAttack(set: (fn: (s: any) => any) => void, get: () =>
   }] }));
 }
 
+function logBrokenWeapons(broken: BrokenWeapon[], get: () => GameState) {
+  for (const { unit, weapon } of broken) {
+    get().addLog(t("weaponBroke", get().lang, {
+      unit: unitName(unit.def.id, get().lang),
+      weapon: weapon.name,
+    }), "#ff9a4a");
+  }
+}
+
+function buildSavePayload(state: GameState, chapterIndex: number): SaveWritePayload {
+  return {
+    chapterId: state.chapter!.id,
+    chapterIndex,
+    turn: state.turn,
+    phase: state.phase,
+    units: state.units.map(serializeRuntimeUnit),
+    campaignRoster: syncCampaignRoster(state.campaignRoster, state.units),
+    convoy: state.convoy.map(item => ({ ...item })),
+    gold: state.gold,
+    completedChapters: [...saveSystem.getMeta().completedChapters],
+    activeDialogue: state.activeDialogue,
+    bossDeathDialogueComplete: state.bossDeathDialogueComplete,
+    victoryResolved: state.victoryResolved,
+    lang: state.lang,
+  };
+}
+
 export const useGame = create<GameState>((set, get) => ({
-  grid: null, chapter: null, units: [], phase: "player", turn: 1, gold: 0,
+  grid: null, chapter: null, units: [], phase: "player", turn: 1, gold: 0, campaignRoster: {},
   selectedUnit: null, hoveredUnit: null, hoveredTile: null,
   moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null,
   combatPreview: null, combatLog: [], objectiveText: "", message: null,
   lang: (typeof localStorage !== "undefined" && localStorage.getItem("srpg-lang") === "zh") ? "zh" : "en",
   hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, lastAction: null, chapterIntro: null, critEvent: 0,
   activeDialogue: null,
-  convoy: [
-    { id: "vulnerary", type: "item", uses: 3 },
-    { id: "vulnerary", type: "item", uses: 3 },
-    { id: "iron_sword", type: "weapon", uses: 45 },
-    { id: "iron_lance", type: "weapon", uses: 45 },
-    { id: "master_seal", type: "item", uses: 1 },
-  ],
+  bossDeathDialogueComplete: false,
+  victoryResolved: false,
+  convoy: createInitialConvoy(),
   expPopup: null,
 
   setLang: (lang) => { if (typeof localStorage !== "undefined") localStorage.setItem("srpg-lang", lang); set({ lang }); },
 
-  initChapter: (i) => {
-    const ch = CHAPTERS[i]; if (!ch) return;
-    visitedVillages = new Set(); // Reset village state for new chapter
-    const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
-    for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
-    const units: RuntimeUnit[] = [];
-    const playerIdsByChapter: Record<string, string[]> = {
-      ch01: ["kael", "lyra", "borin", "serra"],
-      ch02: ["kael", "lyra", "borin", "serra"],
-      ch03: ["kael", "lyra", "borin", "serra", "maren"],
-      ch04: ["kael", "lyra", "borin", "serra", "maren"],
-      ch05: ["kael", "lyra", "borin", "serra", "maren"],
-      ch06: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch07: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch08: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch09: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch10: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch11: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch12: ["kael", "lyra", "borin", "serra", "maren", "darius"],
-      ch13: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch14: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch15: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch16: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch17: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch18: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch19: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-      ch20: ["kael", "lyra", "borin", "serra", "maren", "darius", "yuki"],
-    };
-    const playerIds = playerIdsByChapter[ch.id] || ["kael", "lyra", "borin", "serra"];
-    for (let j = 0; j < playerIds.length && j < ch.deploymentPoints.length; j++) {
-      const u = createUnit(playerIds[j], ch.deploymentPoints[j]); units.push(u); grid.placeUnit(u, ch.deploymentPoints[j]);
-    }
-    for (const e of ch.enemies) {
-      const u = createUnit(e.unitId, e.pos, { aiType: e.aiType, isBoss: e.isBoss }); units.push(u); grid.placeUnit(u, e.pos);
-    }
-    const preDialogue = getDialogueForTrigger(ch.id, "pre");
-    set({ grid, chapter: ch, units, phase: "player", turn: 1, selectedUnit: null, hoveredUnit: null, hoveredTile: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", pendingMove: null, combatPreview: null, combatLog: [], objectiveText: chapterInfo(ch.id, "obj", get().lang), message: null, hitEffects: [], damageNumbers: [], healAuras: [], bloodDecals: [], screenShake: 0, timeScale: 1, slowMoUntil: 0, bossEntrance: null, activeCombat: null, combatPhase: null, activeDialogue: preDialogue, _bossIntroDone: false, pendingProjectiles: [], pendingSlashTrails: [], lastAction: null, chapterIntro: { chapterId: ch.id, born: performance.now() / 1000 } } as any);
+  initChapter: (i) => initializeChapter(set, get, i, {}),
+  startNewCampaign: () => {
+    set({ campaignRoster: {}, gold: 0, convoy: createInitialConvoy() });
+    initializeChapter(set, get, 0, {});
+    get().autosave();
+  },
+  startNextChapter: () => {
+    const st = get();
+    if (!st.chapter || st.phase !== "victory") return;
+    const currentIndex = CHAPTERS.findIndex(chapter => chapter.id === st.chapter!.id);
+    if (currentIndex < 0 || currentIndex >= CHAPTERS.length - 1) return;
+    const roster = syncCampaignRoster(st.campaignRoster, st.units);
+    set({ campaignRoster: roster });
+    initializeChapter(set, get, currentIndex + 1, roster);
+    get().autosave();
   },
 
   selectUnit: (u) => {
@@ -369,6 +411,9 @@ export const useGame = create<GameState>((set, get) => ({
   attackTarget: async (target) => {
     const st = get(); if (!st.selectedUnit || !st.grid || !st.pendingMove) return;
     const atk = st.selectedUnit; const g = st.grid;
+    if (!atk.equippedWeapon || atk.equippedWeapon.uses <= 0) return;
+    const attackWeaponType = atk.equippedWeapon.type;
+    const targetWeaponType = target.equippedWeapon?.type;
     g.moveUnit(atk, st.pendingMove); atk.hasMoved = true;
     set({ phase: "combat", selectionMode: "idle", combatPreview: null, moveRange: new Map(), attackRange: [], activeCombat: { attacker: atk, defender: target }, units: [...g.getAllUnits()] });
     const setP = (ph: string, a: string, d: string, ic = false) => set({ combatPhase: { phase: ph, attackerId: a, defenderId: d, isCounter: ic } });
@@ -380,16 +425,16 @@ export const useGame = create<GameState>((set, get) => ({
       setP(pf + "strike", r.attacker.uid, r.defender.uid, ic);
       // Fire the per-weapon VFX on the strike frame so it lines up
       // with the visible weapon swing / cast animation.
-      queueProjectileForAttack(set, get, r.attacker, r.defender);
+      queueProjectileForAttack(set, r.attacker, r.defender, r.weapon.type);
       // SFX: per-weapon hit + crit sting
-      const wpnType = r.attacker.equippedWeapon?.type;
+      const wpnType = r.weapon.type;
       const sfx = weaponSfxName(wpnType);
       if (sfx) audio.play(sfx);
       if (r.crit) audio.play("crit");
       await sleep(200);
       if (r.hit) {
         get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ffffff");
-        get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
+        get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.weapon.type);
         get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
         get().triggerShake(r.crit ? 0.7 : 0.25);
         if (r.crit) { get().triggerSlowMo(0.25, 280); get().triggerCritFlash(); }
@@ -403,7 +448,7 @@ export const useGame = create<GameState>((set, get) => ({
       g.removeUnit(target);
       get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a");
       get().addBloodDecal([target.pos.x, 0.21, target.pos.y]);
-      target._lastKilledByWeapon = atk.equippedWeapon?.type;
+      target._lastKilledByWeapon = attackWeaponType;
       audio.play("death");
       // Weapon drop
       tryWeaponDrop(target, get);
@@ -412,8 +457,14 @@ export const useGame = create<GameState>((set, get) => ({
       g.removeUnit(atk);
       get().addLog(t("logDefeated", get().lang, { name: unitName(atk.def.id, get().lang) }), "#ff3a3a");
       get().addBloodDecal([atk.pos.x, 0.21, atk.pos.y]);
-      atk._lastKilledByWeapon = target.equippedWeapon?.type;
+      atk._lastKilledByWeapon = targetWeaponType;
       audio.play("death");
+      set(s => ({
+        campaignRoster: {
+          ...s.campaignRoster,
+          [atk.def.id]: snapshotCampaignUnit(atk),
+        },
+      }));
     }
     if (!atk.isDead) {
       const expGain = calculateExp(atk, target, target.isDead);
@@ -430,6 +481,7 @@ export const useGame = create<GameState>((set, get) => ({
         get().clearExpPopup();
       }
     }
+    logBrokenWeapons(removeBrokenWeapons([atk, target]), get);
     atk.hasActed = true;
     set({ phase: "player", selectedUnit: null, pendingMove: null, units: [...g.getAllUnits()], activeCombat: null, combatPhase: null, lastAction: { kind: "attack", targetUid: target.uid } });
     checkBattleEnd(set, get);
@@ -445,7 +497,9 @@ export const useGame = create<GameState>((set, get) => ({
 
   healTarget: (target) => {
     const st = get(); if (!st.selectedUnit || !st.grid || !st.pendingMove) return;
-    const healer = st.selectedUnit; st.grid.moveUnit(healer, st.pendingMove);
+    const healer = st.selectedUnit;
+    if (!healer.equippedWeapon || healer.equippedWeapon.uses <= 0) return;
+    st.grid.moveUnit(healer, st.pendingMove);
     const healAmt = (healer.equippedWeapon?.might || 10) + healer.stats.mag;
     const actual = Math.min(healAmt, target.maxHp - target.hp);
     target.hp += actual; healer.exp += 20;
@@ -455,15 +509,13 @@ export const useGame = create<GameState>((set, get) => ({
     get().addLog(t("logHeal", get().lang, { healer: unitName(healer.def.id, get().lang), target: unitName(target.def.id, get().lang), n: actual }), "#3aff3a");
     get().addDamageNumber([target.pos.x, 1.5, target.pos.y], actual, { isHeal: true });
     get().addHealAura([target.pos.x, 0.22, target.pos.y]);
+    logBrokenWeapons(consumeEquippedWeaponUse(healer), get);
     set({ phase: "player", selectedUnit: null, pendingMove: null, moveRange: new Map(), attackRange: [], selectionMode: "idle", combatPreview: null, hoveredUnit: null, units: [...st.grid.getAllUnits()], lastAction: { kind: "heal", targetUid: target.uid } });
     checkBattleEnd(set, get);
   },
 
   endPlayerTurn: () => {
     const st = get(); if (st.phase !== "player") return;
-    // Auto-save right before the player turn ends so the player can always
-    // resume from this exact state.
-    get().autosave();
     set({ phase: "enemy", selectedUnit: null, moveRange: new Map(), attackRange: [], selectionMode: "idle" });
     setTimeout(() => get().processEnemyTurn(), 500);
   },
@@ -495,6 +547,8 @@ export const useGame = create<GameState>((set, get) => ({
       }
       if (dec.action === "attack" && dec.attackTarget) {
         const target = dec.attackTarget;
+        const attackWeaponType = u.equippedWeapon?.type;
+        const targetWeaponType = target.equippedWeapon?.type;
         const rounds = resolveCombat(u, target, g.getTerrain(u.pos), g.getTerrain(target.pos));
         set({ activeCombat: { attacker: u, defender: target } });
         const setP = (ph: string, a: string, d: string, ic = false) => set({ combatPhase: { phase: ph, attackerId: a, defenderId: d, isCounter: ic } });
@@ -504,11 +558,11 @@ export const useGame = create<GameState>((set, get) => ({
           setP(pf + "windup", r.attacker.uid, r.defender.uid, ic); await sleep(350);
           setP(pf + "strike", r.attacker.uid, r.defender.uid, ic);
           // Per-weapon VFX on the strike frame.
-          queueProjectileForAttack(set, get, r.attacker, r.defender);
+          queueProjectileForAttack(set, r.attacker, r.defender, r.weapon.type);
           await sleep(200);
           if (r.hit) {
             get().addLog(t("logDmg", get().lang, { atk: unitName(r.attacker.def.id, get().lang), def: unitName(r.defender.def.id, get().lang), n: r.damage, crit: r.crit ? t("crit", get().lang) : "", ko: r.lethal ? t("ko", get().lang) : "" }), r.crit ? "#ff6a3a" : "#ff8a5a");
-            get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.attacker.equippedWeapon?.type);
+            get().addHitEffect([r.defender.pos.x, 1.0, r.defender.pos.y], r.crit, r.weapon.type);
             get().addDamageNumber([r.defender.pos.x, 1.5, r.defender.pos.y], r.damage, { isCrit: r.crit });
             get().triggerShake(r.crit ? 0.7 : 0.25);
             if (r.crit) { get().triggerSlowMo(0.25, 280); get().triggerCritFlash(); }
@@ -518,9 +572,24 @@ export const useGame = create<GameState>((set, get) => ({
           setP(pf + "recovery", r.attacker.uid, r.defender.uid, ic); await sleep(250);
         }
         setP("exit", "", ""); await sleep(300);
-        if (target.isDead) { g.removeUnit(target); get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([target.pos.x, 0.21, target.pos.y]); target._lastKilledByWeapon = u.equippedWeapon?.type; audio.play("death"); }
-        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); u._lastKilledByWeapon = target.equippedWeapon?.type; audio.play("death"); }
+        if (target.isDead) {
+          g.removeUnit(target);
+          get().addLog(t("logDefeated", get().lang, { name: unitName(target.def.id, get().lang) }), "#ff3a3a");
+          get().addBloodDecal([target.pos.x, 0.21, target.pos.y]);
+          target._lastKilledByWeapon = attackWeaponType;
+          audio.play("death");
+          if (target.faction === "player") {
+            set(s => ({
+              campaignRoster: {
+                ...s.campaignRoster,
+                [target.def.id]: snapshotCampaignUnit(target),
+              },
+            }));
+          }
+        }
+        if (u.isDead) { g.removeUnit(u); get().addLog(t("logDefeated", get().lang, { name: unitName(u.def.id, get().lang) }), "#ff3a3a"); get().addBloodDecal([u.pos.x, 0.21, u.pos.y]); u._lastKilledByWeapon = targetWeaponType; audio.play("death"); }
         if (!u.isDead) { u.exp += calculateExp(u, target, target.isDead); maybeLevelUp(u, (lv) => audio.play("level_up")); }
+        logBrokenWeapons(removeBrokenWeapons([u, target]), get);
         set({ units: [...g.getAllUnits()], activeCombat: null, combatPhase: null }); await sleep(200);
       } else if (dec.action === "heal" && dec.healTarget) {
         const healAmt = u.equippedWeapon?.might || 10; const actual = Math.min(healAmt, dec.healTarget.maxHp - dec.healTarget.hp);
@@ -530,6 +599,7 @@ export const useGame = create<GameState>((set, get) => ({
         get().addDamageNumber([dec.healTarget.pos.x, 1.5, dec.healTarget.pos.y], actual, { isHeal: true });
         get().addHealAura([dec.healTarget.pos.x, 0.22, dec.healTarget.pos.y]);
         audio.play("heal");
+        logBrokenWeapons(consumeEquippedWeaponUse(u), get);
         set({ units: [...g.getAllUnits()] }); await sleep(300);
       }
     }
@@ -540,6 +610,9 @@ export const useGame = create<GameState>((set, get) => ({
     const ch = get().chapter;
     if (ch?.reinforcements) for (const r of ch.reinforcements) if (r.turn === nt) { const nu = createUnit(r.unitId, r.pos, { aiType: r.aiType }); g.placeUnit(nu, r.pos); get().addLog(t("logReinforce", get().lang), "#ffaa3a"); set({ units: [...g.getAllUnits()] }); }
     checkBattleEnd(set, get);
+    // Keep autosave as a tactical retry point. Saving after the enemy phase
+    // restores a player turn before any unit has committed its next action.
+    if (get().phase === "player") get().autosave();
   },
 
   setSelectionMode: (m) => set({ selectionMode: m }),
@@ -561,16 +634,27 @@ export const useGame = create<GameState>((set, get) => ({
   addLog: (text, color = "#fff") => set(s => ({ combatLog: [...s.combatLog.slice(-20), { text, color }] })),
   setDialogue: (id) => set({ activeDialogue: id }),
   clearDialogue: () => {
-    // If we just finished ch20_victory, automatically chain into
-    // ch20_credits (the cast roll).  If we just finished ch20_credits,
-    // transition to the "epilogue" phase so the OutroOverlay can show.
     const st = get();
     const ch = st.chapter;
-    if (ch?.id === "ch20" && st.activeDialogue === "ch20_victory") {
+    const dialogueId = st.activeDialogue;
+    if (!dialogueId) return;
+
+    // Boss-death dialogue is part of the objective state machine. Mark it
+    // consumed before checking the objective again so it cannot reopen.
+    const bossDeathId = ch ? getDialogueForTrigger(ch.id, "boss_death") : null;
+    if (dialogueId === bossDeathId) {
+      set({ activeDialogue: null, bossDeathDialogueComplete: true });
+      checkBattleEnd(set, get);
+      return;
+    }
+
+    // The final chapter chains victory dialogue into credits, then into the
+    // epilogue overlay.
+    if (ch?.id === "ch20" && dialogueId === "ch20_victory") {
       set({ activeDialogue: "ch20_credits" });
       return;
     }
-    if (ch?.id === "ch20" && st.activeDialogue === "ch20_credits") {
+    if (ch?.id === "ch20" && dialogueId === "ch20_credits") {
       set({ activeDialogue: null, phase: "epilogue" });
       return;
     }
@@ -580,9 +664,12 @@ export const useGame = create<GameState>((set, get) => ({
   pendingSlashTrails: [],
   drainProjectiles: () => { const q = get().pendingProjectiles; set({ pendingProjectiles: [] }); return q; },
   drainSlashTrails: () => { const q = get().pendingSlashTrails; set({ pendingSlashTrails: [] }); return q; },
-  useItemAction: (itemId) => {
-    const st = get(); if (!st.selectedUnit) return;
-    const unit = st.selectedUnit;
+  useItemAction: (itemId, unitUid) => {
+    const st = get();
+    const unit = unitUid
+      ? st.units.find(candidate => candidate.uid === unitUid)
+      : st.selectedUnit;
+    if (!unit || unit.faction !== "player" || unit.isDead) return;
     const result = useItemOnUnit(itemId, unit);
     if (result.success) {
       // Remove item from convoy
@@ -606,6 +693,21 @@ export const useGame = create<GameState>((set, get) => ({
       get().addLog(`${unitName(unit.def.id, st.lang)} equipped ${unit.equippedWeapon.name}`, "#8cf");
       set({ units: [...st.grid!.getAllUnits()] });
     }
+  },
+  equipConvoyWeaponAction: (convoyIndex) => {
+    const st = get();
+    const unit = st.selectedUnit;
+    const convoyEntry = st.convoy[convoyIndex];
+    if (!unit || !convoyEntry || convoyEntry.type !== "weapon") return;
+    const definition = WEAPONS[convoyEntry.id];
+    if (!definition || !unit.classDef.weapons.includes(definition.type)) return;
+    const weapon = { ...definition, uses: convoyEntry.uses };
+    const convoy = [...st.convoy];
+    convoy.splice(convoyIndex, 1);
+    unit.weapons.push(weapon);
+    unit.equippedWeapon = weapon;
+    get().addLog(`${unitName(unit.def.id, st.lang)} equipped ${weapon.name}`, "#8cf");
+    set({ convoy, units: [...st.grid!.getAllUnits()] });
   },
   setLastAction: (kind, targetUid) => set({ lastAction: { kind, targetUid } }),
   clearLastAction: () => set({ lastAction: null }),
@@ -674,7 +776,11 @@ export const useGame = create<GameState>((set, get) => ({
       pendingMove: null,
       combatPreview: null,
       combatLog: [],
+      objectiveText: "",
       message: null,
+      gold: 0,
+      campaignRoster: {},
+      convoy: createInitialConvoy(),
       hitEffects: [],
       damageNumbers: [],
       healAuras: [],
@@ -686,6 +792,13 @@ export const useGame = create<GameState>((set, get) => ({
       activeCombat: null,
       combatPhase: null,
       activeDialogue: null,
+      bossDeathDialogueComplete: false,
+      victoryResolved: false,
+      pendingProjectiles: [],
+      pendingSlashTrails: [],
+      lastAction: null,
+      chapterIntro: null,
+      critEvent: 0,
       expPopup: null,
     } as any);
   },
@@ -695,33 +808,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (!st.chapter || !st.grid) return false;
     const chapterIndex = CHAPTERS.findIndex(c => c.id === st.chapter!.id);
     if (chapterIndex < 0) return false;
-    const payload: Omit<SavePayload, "version" | "savedAt"> = {
-      chapterId: st.chapter.id,
-      chapterIndex,
-      turn: st.turn,
-      phase: st.phase,
-      units: st.units.map(u => ({
-        uid: u.uid,
-        defId: u.def.id,
-        pos: { ...u.pos },
-        hp: u.hp,
-        exp: u.exp,
-        level: u.level,
-        stats: { ...u.stats },
-        weapons: u.weapons.map(w => w.id),
-        equippedWeaponIdx: u.equippedWeapon ? u.weapons.findIndex(w => w.id === u.equippedWeapon!.id) : -1,
-        hasMoved: u.hasMoved,
-        hasActed: u.hasActed,
-        isDead: u.isDead,
-        isBoss: u.isBoss,
-        aiType: u.aiType,
-        faction: u.faction,
-        modelId: u.modelId,
-      })),
-      convoy: [...st.convoy],
-      lang: st.lang,
-    };
-    return saveSystem.write(payload, slotId);
+    return saveSystem.write(buildSavePayload(st, chapterIndex), slotId);
   },
 
   loadFromSlot: (slotId) => {
@@ -743,33 +830,7 @@ export const useGame = create<GameState>((set, get) => ({
     if (!st.chapter || !st.grid || st.phase !== "player") return false;
     const chapterIndex = CHAPTERS.findIndex(c => c.id === st.chapter!.id);
     if (chapterIndex < 0) return false;
-    const payload: Omit<SavePayload, "version" | "savedAt"> = {
-      chapterId: st.chapter.id,
-      chapterIndex,
-      turn: st.turn,
-      phase: st.phase,
-      units: st.units.map(u => ({
-        uid: u.uid,
-        defId: u.def.id,
-        pos: { ...u.pos },
-        hp: u.hp,
-        exp: u.exp,
-        level: u.level,
-        stats: { ...u.stats },
-        weapons: u.weapons.map(w => w.id),
-        equippedWeaponIdx: u.equippedWeapon ? u.weapons.findIndex(w => w.id === u.equippedWeapon!.id) : -1,
-        hasMoved: u.hasMoved,
-        hasActed: u.hasActed,
-        isDead: u.isDead,
-        isBoss: u.isBoss,
-        aiType: u.aiType,
-        faction: u.faction,
-        modelId: u.modelId,
-      })),
-      convoy: [...st.convoy],
-      lang: st.lang,
-    };
-    return saveSystem.write(payload, null);
+    return saveSystem.write(buildSavePayload(st, chapterIndex), null);
   },
 }));
 
@@ -777,37 +838,18 @@ function applySavePayload(set: any, get: any, payload: SavePayload): boolean {
   try {
     const ch = CHAPTERS[payload.chapterIndex] || CHAPTERS.find(c => c.id === payload.chapterId);
     if (!ch) return false;
-    const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
-    for (const dp of ch.deploymentPoints) grid.terrain[dp.y][dp.x] = "deployment";
-    const units: RuntimeUnit[] = [];
-    for (const s of payload.units) {
-      const u = createUnit(s.defId, s.pos, { aiType: s.aiType, isBoss: s.isBoss });
-      (u as any).uid = s.uid;
-      u.hp = s.hp;
-      u.exp = s.exp;
-      u.level = s.level;
-      u.stats = { ...s.stats };
-      if (s.weapons.length > 0) {
-        const weapons: WeaponDef[] = s.weapons
-          .map((wid: string) => WEAPONS[wid])
-          .filter(Boolean) as WeaponDef[];
-        if (weapons.length > 0) {
-          (u as any).weapons = weapons;
-          (u as any).equippedWeapon = weapons[Math.max(0, s.equippedWeaponIdx)] || weapons[0];
-        }
-      }
-      u.hasMoved = s.hasMoved;
-      u.hasActed = s.hasActed;
-      u.isDead = s.isDead;
-      u.modelId = s.modelId || u.modelId;
-      if (!u.isDead) grid.placeUnit(u, u.pos);
-      units.push(u);
-    }
+    const { grid, units } = saveSystem.applyToGrid(payload);
+    saveSystem.mergeCompletedChapters(payload.completedChapters);
+    const restoredPhase: Phase = payload.phase === "victory"
+      || payload.phase === "defeat"
+      || payload.phase === "epilogue"
+      ? payload.phase
+      : "player";
     set({
       grid,
       chapter: ch,
       units,
-      phase: "player",
+      phase: restoredPhase,
       turn: payload.turn,
       selectedUnit: null,
       hoveredUnit: null,
@@ -819,7 +861,11 @@ function applySavePayload(set: any, get: any, payload: SavePayload): boolean {
       combatPreview: null,
       combatLog: [],
       objectiveText: chapterInfo(ch.id, "obj", payload.lang),
-      message: null,
+      message: restoredPhase === "victory"
+        ? t("victory", payload.lang)
+        : restoredPhase === "defeat"
+          ? t("defeat", payload.lang)
+          : null,
       hitEffects: [],
       damageNumbers: [],
       healAuras: [],
@@ -830,13 +876,17 @@ function applySavePayload(set: any, get: any, payload: SavePayload): boolean {
       bossEntrance: null,
       activeCombat: null,
       combatPhase: null,
-      activeDialogue: null,
+      activeDialogue: payload.activeDialogue,
+      bossDeathDialogueComplete: payload.bossDeathDialogueComplete,
+      victoryResolved: payload.victoryResolved,
       _bossIntroDone: false,
       pendingProjectiles: [],
       pendingSlashTrails: [],
       lastAction: null,
       chapterIntro: null,
-      convoy: [...payload.convoy],
+      convoy: payload.convoy.map(item => ({ ...item })),
+      gold: payload.gold,
+      campaignRoster: syncCampaignRoster(payload.campaignRoster, units),
       lang: payload.lang,
       critEvent: 0,
     } as any);
@@ -849,10 +899,16 @@ function applySavePayload(set: any, get: any, payload: SavePayload): boolean {
 
 function checkBattleEnd(set: any, get: any) {
   const s: GameState = get();
+  if (s.victoryResolved || s.phase === "victory" || s.phase === "epilogue") return;
   const players = s.units.filter((u: RuntimeUnit) => u.faction === "player" && !u.isDead);
   const enemies = s.units.filter((u: RuntimeUnit) => u.faction === "enemy" && !u.isDead);
-  const lord = s.units.find((u: RuntimeUnit) => u.def.isLord);
-  if (!players.length || lord?.isDead) { set({ phase: "defeat", message: t("defeat", get().lang) }); return; }
+  const hasLivingLord = players.some((u: RuntimeUnit) => u.def.isLord);
+  // Dead units are removed from GameGrid and therefore from the runtime unit
+  // list. An absent lord must still cause defeat.
+  if (!players.length || !hasLivingLord) {
+    set({ phase: "defeat", message: t("defeat", get().lang) });
+    return;
+  }
   const ch = s.chapter; if (!ch) return;
   let won = false;
   if (ch.objectiveType === "route" && !enemies.length) won = true;
@@ -860,7 +916,10 @@ function checkBattleEnd(set: any, get: any) {
     const liveBoss = s.units.find((u: RuntimeUnit) => u.isBoss && !u.isDead);
     if (!liveBoss) {
       const bd = getDialogueForTrigger(ch.id, "boss_death");
-      if (bd && !s.activeDialogue) { set({ activeDialogue: bd }); return; }
+      if (bd && !s.bossDeathDialogueComplete) {
+        if (s.activeDialogue !== bd) set({ activeDialogue: bd });
+        return;
+      }
       won = true;
     }
   }
@@ -873,21 +932,119 @@ function checkBattleEnd(set: any, get: any) {
     const onTile = players.some((u: RuntimeUnit) => u.pos.x === stTile.x && u.pos.y === stTile.y);
     if (onTile) won = true;
   }
-  if (won) {
-    saveSystem.markChapterComplete(ch.id);
-    // Chapter completion rewards
-    const reward = CHAPTER_REWARDS[ch.id];
-    if (reward) {
-      for (const wid of reward.weapons) {
-        const w = WEAPONS[wid];
-        if (w) get().addToConvoy(wid, "weapon", w.uses);
-      }
-      get().addLog(t("chapterReward", get().lang, { item: reward.weapons.join(", ") + " + " + reward.gold + "G" }), "#ffcc6a");
-      set({ gold: (get().gold || 0) + reward.gold });
+  if (won) resolveChapterVictory(set, get);
+}
+
+function resolveChapterVictory(set: any, get: any) {
+  const s: GameState = get();
+  const ch = s.chapter;
+  if (!ch || s.victoryResolved) return;
+
+  saveSystem.markChapterComplete(ch.id);
+  const reward = CHAPTER_REWARDS[ch.id];
+  const convoy = [...s.convoy];
+  let gold = s.gold;
+  let combatLog = s.combatLog;
+  if (reward) {
+    for (const wid of reward.weapons) {
+      const w = WEAPONS[wid];
+      if (w) convoy.push({ id: wid, type: "weapon", uses: w.uses });
     }
-    const vd = getDialogueForTrigger(ch.id, "victory");
-    set({ phase: "victory", message: t("victory", get().lang), activeDialogue: vd });
+    gold += reward.gold;
+    combatLog = [
+      ...s.combatLog.slice(-20),
+      {
+        text: t("chapterReward", s.lang, { item: reward.weapons.join(", ") + " + " + reward.gold + "G" }),
+        color: "#ffcc6a",
+      },
+    ];
   }
+
+  set({
+    victoryResolved: true,
+    campaignRoster: syncCampaignRoster(s.campaignRoster, s.units),
+    phase: "victory",
+    message: t("victory", s.lang),
+    activeDialogue: getDialogueForTrigger(ch.id, "victory"),
+    convoy,
+    gold,
+    combatLog,
+  });
+}
+
+function initializeChapter(
+  set: any,
+  get: any,
+  chapterIndex: number,
+  sourceRoster: CampaignRoster,
+) {
+  const ch = CHAPTERS[chapterIndex];
+  if (!ch) return;
+  visitedVillages = new Set();
+  const grid = new GameGrid(ch.mapSize.w, ch.mapSize.h, ch.terrain as any);
+  for (const point of ch.deploymentPoints) grid.terrain[point.y][point.x] = "deployment";
+
+  const roster = { ...sourceRoster };
+  const units: RuntimeUnit[] = [];
+  const playerIds = PLAYER_IDS_BY_CHAPTER[ch.id] || ["kael", "lyra", "borin", "serra"];
+  let deploymentIndex = 0;
+  for (const playerId of playerIds) {
+    if (deploymentIndex >= ch.deploymentPoints.length) break;
+    let saved = roster[playerId];
+    if (!saved) {
+      const fresh = createUnit(playerId, ch.deploymentPoints[deploymentIndex]);
+      saved = snapshotCampaignUnit(fresh);
+      roster[playerId] = saved;
+    }
+    if (saved.isDead) continue;
+    const unit = createCampaignRuntimeUnit(saved, ch.deploymentPoints[deploymentIndex], true);
+    units.push(unit);
+    grid.placeUnit(unit, ch.deploymentPoints[deploymentIndex]);
+    deploymentIndex++;
+  }
+  for (const enemy of ch.enemies) {
+    const unit = createUnit(enemy.unitId, enemy.pos, { aiType: enemy.aiType, isBoss: enemy.isBoss });
+    units.push(unit);
+    grid.placeUnit(unit, enemy.pos);
+  }
+
+  set({
+    grid,
+    chapter: ch,
+    units,
+    campaignRoster: roster,
+    phase: "player",
+    turn: 1,
+    selectedUnit: null,
+    hoveredUnit: null,
+    hoveredTile: null,
+    moveRange: new Map(),
+    attackRange: [],
+    selectionMode: "idle",
+    pendingMove: null,
+    combatPreview: null,
+    combatLog: [],
+    objectiveText: chapterInfo(ch.id, "obj", get().lang),
+    message: null,
+    hitEffects: [],
+    damageNumbers: [],
+    healAuras: [],
+    bloodDecals: [],
+    screenShake: 0,
+    timeScale: 1,
+    slowMoUntil: 0,
+    bossEntrance: null,
+    activeCombat: null,
+    combatPhase: null,
+    activeDialogue: getDialogueForTrigger(ch.id, "pre"),
+    bossDeathDialogueComplete: false,
+    victoryResolved: false,
+    _bossIntroDone: false,
+    pendingProjectiles: [],
+    pendingSlashTrails: [],
+    lastAction: null,
+    chapterIntro: { chapterId: ch.id, born: performance.now() / 1000 },
+  } as any);
 }
 
 // === Weapon drop system ===

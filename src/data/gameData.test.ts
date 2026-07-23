@@ -20,6 +20,14 @@ describe("unitFactory", () => {
     expect(u.pos).toEqual({ x: 5, y: 7 });
   });
 
+  it("createUnit gives each unit independent weapon instances", () => {
+    const a = createUnit("kael", { x: 0, y: 0 });
+    const b = createUnit("kael", { x: 1, y: 0 });
+    expect(a.weapons[0]).not.toBe(b.weapons[0]);
+    a.weapons[0].uses = 1;
+    expect(b.weapons[0].uses).toBe(WEAPONS.iron_sword.uses);
+  });
+
   it("createUnit with overrides (boss + isBoss)", () => {
     const u = createUnit("bandit_sword", { x: 0, y: 0 }, { isBoss: true });
     expect(u.isBoss).toBe(true);

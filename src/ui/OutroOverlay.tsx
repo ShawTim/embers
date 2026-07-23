@@ -12,12 +12,16 @@ import { t, type StringKey } from "../i18n";
  * Only renders when phase === "epilogue".  Sets up a one-time music
  * sting + fade in.
  */
-export function OutroOverlay() {
+interface OutroOverlayProps {
+  onReturnToTitle: () => void;
+  onPlayAgain: () => void;
+}
+
+export function OutroOverlay({ onReturnToTitle, onPlayAgain }: OutroOverlayProps) {
   const phase = useGame(s => s.phase);
   const chapter = useGame(s => s.chapter);
   const lang = useGame(s => s.lang);
   const returnToTitle = useGame(s => s.returnToTitle);
-  const initChapter = useGame(s => s.initChapter);
   const [opacity, setOpacity] = useState(0);
   const [showEnd, setShowEnd] = useState(false);
   const tt = (k: StringKey) => t(k, lang);
@@ -160,13 +164,22 @@ export function OutroOverlay() {
         >
           <button
             className="outro-btn outro-btn-primary"
-            onClick={() => { audio.play("select"); returnToTitle(); }}
+            onClick={() => {
+              audio.play("select");
+              returnToTitle();
+              audio.startMusic("title");
+              onReturnToTitle();
+            }}
           >
             {tt("returnToTitle")}
           </button>
           <button
             className="outro-btn"
-            onClick={() => { audio.play("select"); initChapter(0); }}
+            onClick={() => {
+              audio.play("select");
+              returnToTitle();
+              onPlayAgain();
+            }}
           >
             {tt("playAgain")}
           </button>

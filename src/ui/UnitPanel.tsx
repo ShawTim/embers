@@ -26,7 +26,7 @@ export function UnitPanel({ unit }: { unit: RuntimeUnit | null }) {
         <div className="hp-text" style={{ color: hpColor }}>{unit.hp} / {unit.maxHp} {tt("hp")}</div>
       </div>
       <div className="stats-grid">{statKeys.map(([k, v]) => <div key={k} className="stat-row"><span className="stat-label">{tt(k)}</span><span className="stat-val">{v}</span></div>)}</div>
-      {wpn ? <div className="weapon-info">{wpn.name} — {tt("might")}{wpn.might} · {tt("hit")}{wpn.hit}% · {tt("weight")}{wpn.weight}{wpn.crit > 0 ? ` · ${tt("crt")}${wpn.crit}%` : ""}{wpn.minRange !== 1 || wpn.maxRange !== 1 ? ` · ${tt("range")}${wpn.minRange}-${wpn.maxRange}` : ""}</div> : <div className="weapon-info" style={{ color: "#556" }}>{tt("noWeapon")}</div>}
+      {wpn ? <div className="weapon-info">{wpn.name} — {wpn.uses} {tt("uses")} · {tt("might")}{wpn.might} · {tt("hit")}{wpn.hit}% · {tt("weight")}{wpn.weight}{wpn.crit > 0 ? ` · ${tt("crt")}${wpn.crit}%` : ""}{wpn.minRange !== 1 || wpn.maxRange !== 1 ? ` · ${tt("range")}${wpn.minRange}-${wpn.maxRange}` : ""}</div> : <div className="weapon-info" style={{ color: "#556" }}>{tt("noWeapon")}</div>}
       {unit.hasActed && unit.faction === "player" && <div style={{ marginTop: 6, fontSize: 11, color: "#556" }}>{tt("alreadyActed")}</div>}
     </div>
   );

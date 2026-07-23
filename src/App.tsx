@@ -70,7 +70,7 @@ export default function App() {
   const [phase, setPhase] = useState<"loading" | "menu" | "game">("loading");
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState("");
-  const initChapter = useGame(s => s.initChapter);
+  const startNewCampaign = useGame(s => s.startNewCampaign);
   const grid = useGame(s => s.grid);
   const gamePhase = useGame(s => s.phase);
   const chapter = useGame(s => s.chapter);
@@ -185,8 +185,8 @@ export default function App() {
 
   // Start game
   useEffect(() => {
-    if (phase === "game" && !grid) initChapter(0);
-  }, [phase, grid, initChapter]);
+    if (phase === "game" && !grid) startNewCampaign();
+  }, [phase, grid, startNewCampaign]);
 
   // Music + SFX for phase transitions
   useEffect(() => {
@@ -267,7 +267,10 @@ export default function App() {
       <BossEntrance />
       <CritFlash />
       {chapter?.id && <ChapterIntroCard chapterId={chapter.id} />}
-      <OutroOverlay />
+      <OutroOverlay
+        onReturnToTitle={() => setPhase("menu")}
+        onPlayAgain={() => setPhase("game")}
+      />
       {gamePhase === "victory" && (
         <div style={{ position: "absolute", inset: 0, zIndex: 250, pointerEvents: "none", background: "radial-gradient(ellipse at center, rgba(20,60,20,0.3) 0%, rgba(0,0,0,0.6) 100%)" }} />
       )}

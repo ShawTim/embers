@@ -163,6 +163,7 @@ const STRINGS = {
   // Action Menu extra
   item: { en: "Item", zh: "道具" },
   equip: { en: "Equip", zh: "裝備" },
+  takeFromConvoy: { en: "Take from convoy", zh: "從倉庫取出" },
   noItems: { en: "No items", zh: "沒有道具" },
   onlyOneWeapon: { en: "Only one weapon", zh: "只有一把武器" },
   // Item names
@@ -196,6 +197,7 @@ const STRINGS = {
   convoy: { en: "Convoy", zh: "倉庫" },
   equipped: { en: "Equipped", zh: "裝備中" },
   promote: { en: "Promote", zh: "轉職" },
+  selectUnitToPromote: { en: "Choose a unit to promote", zh: "選擇要轉職的單位" },
   newWeapons: { en: "New weapons", zh: "新武器" },
   moveUp: { en: "Movement", zh: "移動力" },
   fullHeal: { en: "Full HP restore", zh: "完全恢復" },
@@ -203,10 +205,14 @@ const STRINGS = {
   villageReward: { en: "Village gift: {item}", zh: "村莊贈禮：{item}" },
   chapterReward: { en: "Chapter reward: {item}", zh: "章節獎勵：{item}" },
   itemDrop: { en: "Dropped: {item}", zh: "掉落：{item}" },
+  weaponBroke: { en: "{unit}'s {weapon} broke!", zh: "{unit} 的 {weapon} 損壞了！" },
   shopTitle: { en: "Shop", zh: "商店" },
   buy: { en: "Buy", zh: "購買" },
   notEnoughGold: { en: "Not enough gold", zh: "金幣不足" },
   goldLabel: { en: "Gold", zh: "金幣" },
+  owned: { en: "Owned", zh: "持有" },
+  purchaseSuccess: { en: "Purchased {item}.", zh: "已購買 {item}。" },
+  shopHint: { en: "Restock before the next battle.", zh: "在下一場戰鬥前補充物資。" },
   visitVillage: { en: "Visit Village", zh: "探訪村莊" },
   villageVisited: { en: "Already visited", zh: "已探訪" },
   cantPromote: { en: "Requires Lv10+", zh: "需要等級10+" },
@@ -214,6 +220,73 @@ const STRINGS = {
 };
 
 export type StringKey = keyof typeof STRINGS;
+
+const SHOP_ITEM_TEXT: Record<string, Record<Lang, { name: string; desc: string }>> = {
+  vulnerary: {
+    en: { name: "Vulnerary", desc: "Restores 10 HP. Three uses." },
+    zh: { name: "傷藥", desc: "恢復 10 點生命，可使用三次。" },
+  },
+  elixir: {
+    en: { name: "Elixir", desc: "Fully restores one unit's HP." },
+    zh: { name: "萬靈藥", desc: "完全恢復一個單位的生命。" },
+  },
+  master_seal: {
+    en: { name: "Master Seal", desc: "Promotes an eligible Lv10+ unit." },
+    zh: { name: "大師封印", desc: "讓符合資格的等級 10+ 單位轉職。" },
+  },
+  str_ring: {
+    en: { name: "Strength Ring", desc: "Permanently grants +2 STR." },
+    zh: { name: "力量指環", desc: "永久增加 2 點力量。" },
+  },
+  spd_ring: {
+    en: { name: "Speed Ring", desc: "Permanently grants +2 SPD." },
+    zh: { name: "速度指環", desc: "永久增加 2 點速度。" },
+  },
+  def_ring: {
+    en: { name: "Defense Ring", desc: "Permanently grants +2 DEF." },
+    zh: { name: "防禦指環", desc: "永久增加 2 點防禦。" },
+  },
+  iron_sword: {
+    en: { name: "Iron Sword", desc: "Reliable basic sword with 45 uses." },
+    zh: { name: "鐵劍", desc: "可靠的基本劍，耐久度 45。" },
+  },
+  steel_sword: {
+    en: { name: "Steel Sword", desc: "A heavier sword with 30 uses." },
+    zh: { name: "鋼劍", desc: "威力較高的重劍，耐久度 30。" },
+  },
+  iron_lance: {
+    en: { name: "Iron Lance", desc: "Reliable basic lance with 45 uses." },
+    zh: { name: "鐵槍", desc: "可靠的基本槍，耐久度 45。" },
+  },
+  steel_lance: {
+    en: { name: "Steel Lance", desc: "A heavier lance with 30 uses." },
+    zh: { name: "鋼槍", desc: "威力較高的重槍，耐久度 30。" },
+  },
+  iron_axe: {
+    en: { name: "Iron Axe", desc: "Hard-hitting basic axe with 45 uses." },
+    zh: { name: "鐵斧", desc: "威力強勁的基本斧，耐久度 45。" },
+  },
+  iron_bow: {
+    en: { name: "Iron Bow", desc: "Basic bow effective against flying units." },
+    zh: { name: "鐵弓", desc: "對飛行單位有效的基本弓。" },
+  },
+  fire: {
+    en: { name: "Fire", desc: "Basic anima magic with range 1–2." },
+    zh: { name: "火焰魔法", desc: "射程 1–2 的基本理魔法。" },
+  },
+  heal_staff: {
+    en: { name: "Heal Staff", desc: "Restores an adjacent ally's HP." },
+    zh: { name: "治療杖", desc: "恢復相鄰友軍的生命。" },
+  },
+  hand_axe: {
+    en: { name: "Hand Axe", desc: "Throwable axe with range 1–2." },
+    zh: { name: "手斧", desc: "射程 1–2 的投擲斧。" },
+  },
+  javelin: {
+    en: { name: "Javelin", desc: "Throwable lance with range 1–2." },
+    zh: { name: "標槍", desc: "射程 1–2 的投擲槍。" },
+  },
+};
 
 export function t(key: StringKey, lang: Lang, params?: Record<string, string | number>): string {
   const entry = STRINGS[key];
@@ -225,6 +298,10 @@ export function t(key: StringKey, lang: Lang, params?: Record<string, string | n
     }
   }
   return text;
+}
+
+export function shopItemInfo(id: string, lang: Lang): { name: string; desc: string } {
+  return SHOP_ITEM_TEXT[id]?.[lang] || { name: id, desc: "" };
 }
 
 export function unitName(defId: string, lang: Lang): string {

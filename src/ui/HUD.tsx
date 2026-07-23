@@ -10,9 +10,11 @@ import { LangToggle } from "./LangToggle";
 import { UnitList } from "./UnitList";
 import { SoundToggle } from "./SoundToggle";
 import { SaveLoadModal } from "./SaveLoadModal";
+import { ShopModal } from "./ShopModal";
 
 export function HUD() {
   const [showSaveLoad, setShowSaveLoad] = useState(false);
+  const [showShop, setShowShop] = useState(false);
   const turn = useGame(s => s.turn);
   const phase = useGame(s => s.phase);
   const chapter = useGame(s => s.chapter);
@@ -27,6 +29,7 @@ export function HUD() {
   const selectedUnit = useGame(s => s.selectedUnit);
   const selectionMode = useGame(s => s.selectionMode);
   const units = useGame(s => s.units);
+  const gold = useGame(s => s.gold);
   const lang = useGame(s => s.lang);
   const tt = (k: StringKey, p?: Record<string, string | number>) => t(k, lang, p);
   const terrainDef = hoveredTile && grid ? TERRAIN[grid.getTerrain(hoveredTile)] : null;
@@ -51,6 +54,7 @@ export function HUD() {
       <div className={`phase-badge ${pc}`}>{tt(pk)}</div>
       <div className="objective">{chapter ? chapterInfo(chapter.id, "obj", lang) : ""}</div>
       <div className="unit-counts">{playerReady}/{playerTotal} {tt("ready")} · {enemyAlive} {tt("enemies")}</div>
+      <div className="gold-badge">◆ {gold}G</div>
       <LangToggle />
       <SoundToggle />
       <button className="btn-save-load" onClick={() => setShowSaveLoad(true)} title="Save / Load">💾</button>
@@ -63,9 +67,46 @@ export function HUD() {
     <div className="hud-bottom-right"><UnitPanel unit={displayUnit ?? null} /></div>
     <ActionMenu /><CombatPreview /><UnitList />
     <div className="combat-log">{combatLog.slice(-4).map((l, i) => <div key={i} className="log-line" style={{ color: l.color }}>{l.text}</div>)}</div>
-    {message && (phase === "victory" || phase === "defeat") && (<div className="big-message" style={{ color: phase === "victory" ? "#5fa84a" : "#e8484a" }}>{message}{phase === "victory" && (() => { const ch = useGame.getState().chapter; const idx = ch ? CHAPTERS.findIndex(c => c.id === ch.id) : -1; const isLast = idx === CHAPTERS.length - 1; const isFinalChapter = ch?.id === "ch20"; const label = isFinalChapter ? tt("continueToEpilogue") : (isLast ? tt("playAgain") : tt("nextChapter")); return <div style={{ fontSize: 16, marginTop: 20, pointerEvents: "auto" }}><button style={{ padding: "10px 28px", fontSize: 14, cursor: "pointer", background: "linear-gradient(180deg, #2a4a7a, #1a3050)", color: "#fff", border: "1px solid #4a7aaa", borderRadius: 6 }} onClick={() => { if (isFinalChapter) { useGame.getState().startEpilogue(); } else { useGame.getState().initChapter(isLast ? 0 : idx + 1); } }}>{label}</button></div>; })()}</div>)}
+    {message && (phase === "victory" || phase === "defeat") && (
+      <div
+        className="big-message"
+        style={{ color: phase === "victory" ? "#5fa84a" : "#e8484a" }}
+      >
+        {message}
+        {phase === "victory" && (() => {
+          const ch = useGame.getState().chapter;
+          const idx = ch ? CHAPTERS.findIndex(candidate => candidate.id === ch.id) : -1;
+          const isLast = idx === CHAPTERS.length - 1;
+          const isFinalChapter = ch?.id === "ch20";
+          const label = isFinalChapter
+            ? tt("continueToEpilogue")
+            : isLast
+              ? tt("playAgain")
+              : tt("nextChapter");
+          return (
+            <div className="victory-actions">
+              {!isFinalChapter && (
+                <button className="victory-shop-btn" onClick={() => setShowShop(true)}>
+                  {tt("shopTitle")} · {gold}G
+                </button>
+              )}
+              <button
+                className="victory-next-btn"
+                onClick={() => {
+                  if (isFinalChapter) useGame.getState().startEpilogue();
+                  else useGame.getState().startNextChapter();
+                }}
+              >
+                {label}
+              </button>
+            </div>
+          );
+        })()}
+      </div>
+    )}
     {phase === "player" && <TutorialHint mode={selectionMode} ready={playerReady} lang={lang} />}
     {showSaveLoad && <SaveLoadModal onClose={() => setShowSaveLoad(false)} />}
+    {showShop && phase === "victory" && <ShopModal onClose={() => setShowShop(false)} />}
   </>);
 }
 

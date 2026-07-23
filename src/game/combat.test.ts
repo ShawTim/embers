@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { getAttackPower, getWeaponTriangle, getHitRate, getCritRate, previewCombat, resolveCombat } from "./combat";
+import {
+  consumeEquippedWeaponUse,
+  getAttackPower,
+  getCritRate,
+  getHitRate,
+  getWeaponTriangle,
+  previewCombat,
+  removeBrokenWeapons,
+  resolveCombat,
+} from "./combat";
 import { createUnit } from "../data/unitFactory";
 import { GameGrid } from "./grid";
+import { WEAPONS } from "../data/gameData";
 
 describe("combat", () => {
   it("getAttackPower for staff is 0", () => {
@@ -86,5 +96,65 @@ describe("combat", () => {
     } finally {
       Math.random = origRandom;
     }
+  });
+
+  it("consumes durability on every attack attempt, including misses", () => {
+    const originalRandom = Math.random;
+    Math.random = () => 0.99;
+    try {
+      const kael = createUnit("kael", { x: 0, y: 0 });
+      const bandit = createUnit("bandit_sword", { x: 0, y: 1 });
+      if (!kael.equippedWeapon) throw new Error("Kael has no weapon");
+      kael.equippedWeapon.hit = 0;
+      kael.equippedWeapon.uses = 5;
+
+      const rounds = resolveCombat(kael, bandit, "plain", "plain");
+
+      expect(rounds[0].hit).toBe(false);
+      expect(kael.equippedWeapon.uses).toBe(4);
+    } finally {
+      Math.random = originalRandom;
+    }
+  });
+
+  it("limits follow-up attacks to remaining durability", () => {
+    const kael = createUnit("kael", { x: 0, y: 0 });
+    const bandit = createUnit("bandit_axe", { x: 0, y: 1 });
+    if (!kael.equippedWeapon) throw new Error("Kael has no weapon");
+    kael.stats.spd = bandit.stats.spd + 10;
+    kael.equippedWeapon.uses = 1;
+
+    const preview = previewCombat(kael, bandit, "plain", "plain");
+    const rounds = resolveCombat(kael, bandit, "plain", "plain");
+
+    expect(preview.attackerDoubles).toBe(false);
+    expect(rounds.filter(round => round.attacker === kael)).toHaveLength(1);
+    expect(kael.equippedWeapon.uses).toBe(0);
+  });
+
+  it("removes broken weapons and automatically equips the next weapon", () => {
+    const kael = createUnit("kael", { x: 0, y: 0 });
+    const brokenWeapon = kael.weapons[0];
+    brokenWeapon.uses = 0;
+    kael.weapons.push({ ...WEAPONS.killing_edge, uses: 8 });
+
+    const broken = removeBrokenWeapons([kael]);
+
+    expect(broken).toEqual([{ unit: kael, weapon: brokenWeapon }]);
+    expect(kael.weapons).toHaveLength(1);
+    expect(kael.equippedWeapon?.id).toBe("killing_edge");
+  });
+
+  it("consumes staff durability and removes the staff at zero uses", () => {
+    const lyra = createUnit("lyra", { x: 0, y: 0 });
+    if (!lyra.equippedWeapon) throw new Error("Lyra has no staff");
+    lyra.equippedWeapon.uses = 1;
+
+    const broken = consumeEquippedWeaponUse(lyra);
+
+    expect(broken).toHaveLength(1);
+    expect(broken[0].weapon.id).toBe("heal_staff");
+    expect(lyra.weapons).toHaveLength(0);
+    expect(lyra.equippedWeapon).toBeNull();
   });
 });

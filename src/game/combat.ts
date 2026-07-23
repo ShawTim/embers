@@ -48,8 +48,34 @@ export interface CombatPreview {
 }
 
 export function previewCombat(atk: RuntimeUnit, def: RuntimeUnit, atkT: TerrainType, defT: TerrainType): CombatPreview {
-  const atkWpn = atk.equippedWeapon!, defWpn = def.equippedWeapon;
-  const wt = getWeaponTriangle(atkWpn, defWpn!);
+  const equippedAttackerWeapon = atk.equippedWeapon;
+  const equippedDefenderWeapon = def.equippedWeapon;
+  const atkWpn = equippedAttackerWeapon && equippedAttackerWeapon.uses > 0
+    ? equippedAttackerWeapon
+    : null;
+  const defWpn = equippedDefenderWeapon
+    && equippedDefenderWeapon.uses > 0
+    && equippedDefenderWeapon.type !== "staff"
+    ? equippedDefenderWeapon
+    : null;
+  if (!atkWpn) {
+    return {
+      attackerDmg: 0,
+      defenderDmg: 0,
+      attackerHit: 0,
+      defenderHit: 0,
+      attackerCrit: 0,
+      defenderCrit: 0,
+      attackerDoubles: false,
+      defenderDoubles: false,
+      willCounter: false,
+      weaponTriangle: 0,
+      attackerHpAfter: atk.hp,
+      defenderHpAfter: def.hp,
+      isLethal: false,
+    };
+  }
+  const wt = defWpn ? getWeaponTriangle(atkWpn, defWpn) : 0;
   const effMult = getEffectiveness(atkWpn, def);
   const atkPower = getAttackPower(atk) + wt;
   const isMag = ["fire","thunder","wind","light","dark"].includes(atkWpn.type);
@@ -72,8 +98,8 @@ export function previewCombat(atk: RuntimeUnit, def: RuntimeUnit, atkT: TerrainT
   const attackerCrit = Math.max(0, getCritRate(atk) - getCritAvoid(def));
   const defenderCrit = willCounter ? Math.max(0, getCritRate(def) - getCritAvoid(atk)) : 0;
   const atkAS = getAttackSpeed(atk), defAS = getAttackSpeed(def);
-  const attackerDoubles = atkAS >= defAS + 4;
-  const defenderDoubles = willCounter && defAS >= atkAS + 4;
+  const attackerDoubles = atkAS >= defAS + 4 && atkWpn.uses >= 2;
+  const defenderDoubles = willCounter && defAS >= atkAS + 4 && (defWpn?.uses || 0) >= 2;
   const totalAtkDmg = attackerDmg * (attackerDoubles ? 2 : 1);
   const totalDefDmg = willCounter ? defenderDmg * (defenderDoubles ? 2 : 1) : 0;
   const defenderHpAfter = Math.max(0, def.hp - totalAtkDmg);
@@ -81,30 +107,118 @@ export function previewCombat(atk: RuntimeUnit, def: RuntimeUnit, atkT: TerrainT
   return { attackerDmg, defenderDmg, attackerHit, defenderHit, attackerCrit, defenderCrit, attackerDoubles, defenderDoubles, willCounter, weaponTriangle: wt, attackerHpAfter, defenderHpAfter, isLethal: defenderHpAfter === 0 };
 }
 
-export interface CombatRound { attacker: RuntimeUnit; defender: RuntimeUnit; damage: number; hit: boolean; crit: boolean; lethal: boolean; }
+export interface CombatRound {
+  attacker: RuntimeUnit;
+  defender: RuntimeUnit;
+  weapon: WeaponDef;
+  damage: number;
+  hit: boolean;
+  crit: boolean;
+  lethal: boolean;
+}
 
 export function resolveCombat(atk: RuntimeUnit, def: RuntimeUnit, atkT: TerrainType, defT: TerrainType): CombatRound[] {
   const p = previewCombat(atk, def, atkT, defT);
   const rounds: CombatRound[] = [];
-  type Step = { atk: RuntimeUnit; def: RuntimeUnit; hit: number; crit: number; dmg: number };
-  const steps: Step[] = [{ atk: atk, def: def, hit: p.attackerHit, crit: p.attackerCrit, dmg: p.attackerDmg }];
-  if (p.attackerDoubles) steps.push({ atk: atk, def: def, hit: p.attackerHit, crit: p.attackerCrit, dmg: p.attackerDmg });
-  if (p.willCounter && def.hp > 0) {
-    steps.push({ atk: def, def: atk, hit: p.defenderHit, crit: p.defenderCrit, dmg: p.defenderDmg });
-    if (p.defenderDoubles) steps.push({ atk: def, def: atk, hit: p.defenderHit, crit: p.defenderCrit, dmg: p.defenderDmg });
+  const attackerWeapon = atk.equippedWeapon;
+  const defenderWeapon = def.equippedWeapon;
+  if (!attackerWeapon || attackerWeapon.uses <= 0) return rounds;
+  type Step = {
+    atk: RuntimeUnit;
+    def: RuntimeUnit;
+    weapon: WeaponDef;
+    hit: number;
+    crit: number;
+    dmg: number;
+  };
+  const steps: Step[] = [{
+    atk,
+    def,
+    weapon: attackerWeapon,
+    hit: p.attackerHit,
+    crit: p.attackerCrit,
+    dmg: p.attackerDmg,
+  }];
+  if (p.attackerDoubles) {
+    steps.push({
+      atk,
+      def,
+      weapon: attackerWeapon,
+      hit: p.attackerHit,
+      crit: p.attackerCrit,
+      dmg: p.attackerDmg,
+    });
+  }
+  if (p.willCounter && def.hp > 0 && defenderWeapon) {
+    steps.push({
+      atk: def,
+      def: atk,
+      weapon: defenderWeapon,
+      hit: p.defenderHit,
+      crit: p.defenderCrit,
+      dmg: p.defenderDmg,
+    });
+    if (p.defenderDoubles) {
+      steps.push({
+        atk: def,
+        def: atk,
+        weapon: defenderWeapon,
+        hit: p.defenderHit,
+        crit: p.defenderCrit,
+        dmg: p.defenderDmg,
+      });
+    }
   }
   for (const s of steps) {
     if (s.def.hp <= 0) break;
+    if (s.weapon.uses <= 0) continue;
+    s.weapon.uses -= 1;
     const isHit = Math.random() * 100 <= s.hit;
     const isCrit = isHit && Math.random() * 100 <= s.crit;
     const dmg = isHit ? (isCrit ? s.dmg * 3 : s.dmg) : 0;
     const lethal = dmg >= s.def.hp;
     s.def.hp = Math.max(0, s.def.hp - dmg);
     if (lethal) s.def.isDead = true;
-    rounds.push({ attacker: s.atk, defender: s.def, damage: dmg, hit: isHit, crit: isCrit, lethal });
+    rounds.push({
+      attacker: s.atk,
+      defender: s.def,
+      weapon: s.weapon,
+      damage: dmg,
+      hit: isHit,
+      crit: isCrit,
+      lethal,
+    });
     if (lethal) break;
   }
   return rounds;
+}
+
+export interface BrokenWeapon {
+  unit: RuntimeUnit;
+  weapon: WeaponDef;
+}
+
+export function removeBrokenWeapons(units: RuntimeUnit[]): BrokenWeapon[] {
+  const broken: BrokenWeapon[] = [];
+  for (const unit of [...new Set(units)]) {
+    const brokenForUnit = unit.weapons.filter(weapon => weapon.uses <= 0);
+    if (brokenForUnit.length === 0) continue;
+    for (const weapon of brokenForUnit) broken.push({ unit, weapon });
+    unit.weapons = unit.weapons.filter(weapon => weapon.uses > 0);
+    if (!unit.equippedWeapon || brokenForUnit.includes(unit.equippedWeapon)) {
+      unit.equippedWeapon = unit.weapons.find(weapon => weapon.type !== "staff")
+        || unit.weapons[0]
+        || null;
+    }
+  }
+  return broken;
+}
+
+export function consumeEquippedWeaponUse(unit: RuntimeUnit): BrokenWeapon[] {
+  const weapon = unit.equippedWeapon;
+  if (!weapon || weapon.uses <= 0) return removeBrokenWeapons([unit]);
+  weapon.uses -= 1;
+  return removeBrokenWeapons([unit]);
 }
 
 export function calculateExp(atk: RuntimeUnit, def: RuntimeUnit, killed: boolean): number {

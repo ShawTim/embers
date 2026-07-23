@@ -3,8 +3,7 @@ import { t, unitName, className } from "../i18n";
 import type { RuntimeUnit } from "../types";
 import type { Lang } from "../i18n";
 import { CLASSES, PROMOTIONS, WEAPONS } from "../data/gameData";
-import { promoteUnit } from "../data/unitFactory";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export function PromotionScreen() {
   const selectionMode = useGame(s => s.selectionMode);
@@ -26,15 +25,65 @@ export function PromotionScreen() {
   const eligible = units.filter(u => u.faction === "player" && !u.isDead && u.level >= 10 && u.classDef.tier === 1);
   if (eligible.length === 0) return null;
 
+  const closePromotion = () => {
+    setSelectedUnitUid(null);
+    setShowConfirm(false);
+  };
+
+  if (showConfirm && !selectedUnitUid) {
+    return (
+      <>
+        <div className="overlay" onClick={closePromotion} />
+        <div className="promo-panel">
+          <div className="promo-header">
+            <span className="promo-title">✨ {t("promote", lang)}</span>
+            <button className="btn-close" onClick={closePromotion}>✕</button>
+          </div>
+          <div className="promo-body">
+            <div className="promo-unit">{t("selectUnitToPromote", lang)}</div>
+            {eligible.map(unit => (
+              <button
+                className="promo-confirm-btn"
+                key={unit.uid}
+                onClick={() => setSelectedUnitUid(unit.uid)}
+              >
+                {unitName(unit.def.id, lang)} · {t("level", lang)}{unit.level} {className(unit.classDef.id, lang)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    );
+  }
+
   // If a unit is selected for promotion confirmation
   if (showConfirm && selectedUnitUid) {
     const unit = units.find(u => u.uid === selectedUnitUid);
-    if (unit) return <ConfirmPromotion unit={unit} lang={lang} onConfirm={() => { useItemAction("master_seal"); setShowConfirm(false); }} onCancel={() => setShowConfirm(false)} />;
+    if (unit) {
+      return (
+        <ConfirmPromotion
+          unit={unit}
+          lang={lang}
+          onConfirm={() => {
+            useItemAction("master_seal", unit.uid);
+            closePromotion();
+          }}
+          onCancel={closePromotion}
+        />
+      );
+    }
   }
 
   return (
     <div className="promo-trigger">
-      <button onClick={() => setShowConfirm(true)}>✨ {t("promote", lang)}</button>
+      <button
+        onClick={() => {
+          if (eligible.length === 1) setSelectedUnitUid(eligible[0].uid);
+          setShowConfirm(true);
+        }}
+      >
+        ✨ {t("promote", lang)}
+      </button>
     </div>
   );
 }

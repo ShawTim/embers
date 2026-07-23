@@ -46,7 +46,9 @@ export function createUnit(defId: string, pos: { x: number; y: number }, overrid
     stats[stat] = base + Math.floor((growth + personal) * 0.01 * (def.level - 1));
   }
   const maxHp = stats.hp;
-  const weapons = def.inventory.filter((id: string) => WEAPONS[id]).map((id: string) => WEAPONS[id]);
+  const weapons = def.inventory
+    .filter((id: string) => WEAPONS[id])
+    .map((id: string) => ({ ...WEAPONS[id] }));
   const equippedWeapon = weapons.find((w: any) => w.type !== "staff") || weapons[0] || null;
   return {
     uid: `${defId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -74,7 +76,7 @@ export function promoteUnit(unit: RuntimeUnit): boolean {
     if (!oldClass.weapons.includes(wt)) {
       const basicWeapon = Object.values(WEAPONS).find((w: any) => w.type === wt && w.rank === 1);
       if (basicWeapon && !unit.weapons.find((w: any) => w.id === basicWeapon.id)) {
-        unit.weapons.push(basicWeapon);
+        unit.weapons.push({ ...basicWeapon });
       }
     }
   }

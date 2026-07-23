@@ -16,6 +16,7 @@ export function ActionMenu() {
   const cancelMove = useGame(s => s.cancelMove);
   const useItemAction = useGame(s => s.useItemAction);
   const equipWeaponAction = useGame(s => s.equipWeaponAction);
+  const equipConvoyWeaponAction = useGame(s => s.equipConvoyWeaponAction);
   const lang = useGame(s => s.lang);
   const convoy = useGame(s => s.convoy);
   const [submenu, setSubmenu] = useState<"main" | "item" | "equip" | "stats">(null!);
@@ -69,6 +70,13 @@ export function ActionMenu() {
   const style: React.CSSProperties = { left: "50%", top: "55%", transform: "translateX(-50%)" };
   const tt = (k: any) => t(k, lang);
   const itemName = (id: string) => { const k = `i_${id}` as any; const r = t(k, lang); return r === k ? id : r; };
+  const compatibleConvoyWeapons = convoy
+    .map((entry, index) => ({ entry, index, weapon: WEAPONS[entry.id] }))
+    .filter(({ entry, weapon }) =>
+      entry.type === "weapon"
+      && !!weapon
+      && selectedUnit.classDef.weapons.includes(weapon.type),
+    );
 
   if (submenu === "item") {
     const items = convoy.filter(c => c.type === "item");
@@ -87,10 +95,23 @@ export function ActionMenu() {
         <button onClick={() => setSubmenu(null!)}>↩ {tt("cancel")}</button>
         {selectedUnit.weapons.map((w, i) => (
           <button key={i} onClick={() => { equipWeaponAction(i); setSubmenu(null!); }} style={w === selectedUnit.equippedWeapon ? { color: "#6c6" } : {}}>
-            {w === selectedUnit.equippedWeapon ? "✓ " : ""}{w.name} {tt("might")}{w.might}
+            {w === selectedUnit.equippedWeapon ? "✓ " : ""}{w.name} · {w.uses} {tt("uses")} · {tt("might")}{w.might}
           </button>
         ))}
-        {selectedUnit.weapons.length <= 1 && <button disabled>{tt("onlyOneWeapon")}</button>}
+        {compatibleConvoyWeapons.map(({ entry, index, weapon }) => (
+          <button
+            key={`convoy-${index}`}
+            onClick={() => {
+              equipConvoyWeaponAction(index);
+              setSubmenu(null!);
+            }}
+          >
+            ↧ {tt("takeFromConvoy")}: {weapon.name} · {entry.uses} {tt("uses")}
+          </button>
+        ))}
+        {selectedUnit.weapons.length <= 1 && compatibleConvoyWeapons.length === 0 && (
+          <button disabled>{tt("onlyOneWeapon")}</button>
+        )}
       </div>
     );
   }
@@ -100,7 +121,9 @@ export function ActionMenu() {
       {canAttack && <button onClick={onAttack}>⚔ {tt("attack")}</button>}
       {canHeal && <button onClick={onHeal}>✚ {tt("heal")}</button>}
       <button onClick={() => setSubmenu("item")}>🎒 {tt("item")}</button>
-      {selectedUnit.weapons.length > 1 && <button onClick={() => setSubmenu("equip")}>🗡 {tt("equip")}</button>}
+      {(selectedUnit.weapons.length > 1 || compatibleConvoyWeapons.length > 0) && (
+        <button onClick={() => setSubmenu("equip")}>🗡 {tt("equip")}</button>
+      )}
       <button onClick={() => setShowStats(true)}>📊 {tt("stats")}</button>
       <button onClick={waitUnit}>⏳ {tt("wait")}</button>
       <button onClick={cancelMove}>↩ {tt("cancel")}</button>
