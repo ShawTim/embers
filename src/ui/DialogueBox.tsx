@@ -6,6 +6,7 @@ import { Portrait3D } from "./Portrait3D";
 import { audio } from "../audio/engine";
 import { MODEL_PATHS } from "../three/Unit3D";
 import { UNITS } from "../data/gameData";
+import { runtimeDelay } from "../game/timing";
 
 // Map unit def.id to modelId for portraits.  By default we use the
 // unit's own modelId from gameData (so we don't need separate
@@ -52,7 +53,7 @@ export function DialogueBox() {
         setIsTyping(false);
         if (typewriterRef.current) clearInterval(typewriterRef.current);
       }
-    }, 25);
+    }, runtimeDelay(25));
 
     return () => { if (typewriterRef.current) clearInterval(typewriterRef.current); };
   }, [script, lineIndex, lang]);

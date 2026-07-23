@@ -20,6 +20,7 @@ import {
   syncCampaignRoster,
   type CampaignRoster,
 } from "./campaign";
+import { runtimeDelay } from "./timing";
 
 // Village reward pools per chapter tier
 // Shop items available between chapters
@@ -255,7 +256,7 @@ interface GameState {
   autosave: () => boolean;
 }
 
-const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, runtimeDelay(ms)));
 
 // ---------------------------------------------------------------------------
 //  Per-weapon VFX dispatch.  When a unit attacks, push a projectile spec
@@ -517,7 +518,7 @@ export const useGame = create<GameState>((set, get) => ({
   endPlayerTurn: () => {
     const st = get(); if (st.phase !== "player") return;
     set({ phase: "enemy", selectedUnit: null, moveRange: new Map(), attackRange: [], selectionMode: "idle" });
-    setTimeout(() => get().processEnemyTurn(), 500);
+    setTimeout(() => get().processEnemyTurn(), runtimeDelay(500));
   },
 
   processEnemyTurn: async () => {
