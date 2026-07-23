@@ -7,4 +7,8 @@ dist/
 # Throwaway playwright E2E debug scripts (kept on disk, not in git)
 e2e_*.mjs
 smoke_*.mjs
+debug_*.mjs
+smoke.mjs
+tests/e2e/*.local.mjs
+playthrough/
 /tmp/
