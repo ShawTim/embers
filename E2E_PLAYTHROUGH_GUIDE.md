@@ -97,6 +97,11 @@ required for:
 - Pressing **Next Chapter**.
 - Pressing epilogue/replay/title buttons.
 
+At the start of each chapter, after introductory dialogue is dismissed and
+before the first tactical action, the runner overwrites manual save slot 1.
+This is the legal chapter-start checkpoint for recovering from an early
+critical casualty that the rolling autosave can no longer undo.
+
 The 3D battlefield is canvas-based, so the driver may invoke the same public
 store actions used by the battlefield UI when reliable canvas coordinates are
 not practical. Limit this to legal player input:
@@ -116,18 +121,15 @@ actions directly merely to bypass their visible UI.
 
 ## 4. Workspace and artifact hygiene
 
-Use a temporary Playwright driver at:
+Use the committed Playwright driver:
 
 ```text
-tests/e2e/full-campaign-run.local.mjs
+tests/e2e/full-campaign.mjs
 ```
 
-This location allows the script to resolve the repository's local Playwright
-dependency. The file is disposable:
-
-- Do not commit it.
-- Delete it after the run unless the user explicitly asks to retain it.
-- Do not overwrite any existing E2E or debug script.
+The execution agent must run this driver rather than designing or rewriting a
+new tactical bot. Changes to the driver belong in a separately reviewed coding
+task, not in the long-running acceptance task.
 
 Create a unique output directory outside the repository:
 
@@ -181,6 +183,7 @@ With the server running, execute:
 ```bash
 npm run test:e2e:campaign
 npm run test:e2e:final
+npm run test:e2e:full
 ```
 
 If any preflight command fails:
@@ -209,6 +212,10 @@ const context = await browser.newContext({
 
 Create a fresh browser context so an old autosave cannot replace the intended
 new campaign. Do not preload or edit local storage.
+
+The runner uses the development-only `?e2eSpeed=` query parameter to scale
+game-owned animation delays. This is the only permitted speed control. It does
+not patch global timers and is ignored by production builds.
 
 Capture both browser error channels from before navigation:
 
@@ -493,13 +500,16 @@ A genuine campaign must not silently continue after defeat.
 
 For each chapter:
 
-1. Capture the defeat state and `chNN_defeat_attempt_A.png`.
-2. Record the cause, turn, roster, inventory, and browser errors.
-3. Retry the same chapter using the visible autosave load flow.
-4. Assert that the loaded chapter ID is still `chNN`.
-5. Assert that the loaded state is a player-turn checkpoint with at least one
+1. Create the chapter-start manual checkpoint through the visible save UI.
+2. Capture the defeat state and `chNN_defeat_attempt_A.png`.
+3. Record the cause, turn, roster, inventory, and browser errors.
+4. Retry tactical defeat using the visible autosave load flow.
+5. Retry a dead staff user or multiple player casualties from the visible
+   chapter-start manual checkpoint while attempts remain.
+6. Assert that the loaded chapter ID is still `chNN`.
+7. Assert that the loaded state is a player-turn checkpoint with at least one
    living, unacted player unit.
-6. Adjust legal tactics from that checkpoint or an earlier shop decision.
+8. Adjust legal tactics from that checkpoint or an earlier shop decision.
 
 Autosave is intended to represent the beginning of a player turn, before that
 turn's actions are committed. A load that restores defeat, enemy phase, no
@@ -672,14 +682,13 @@ After writing all artifacts:
 
 1. Close the browser.
 2. Stop only the Vite process started for this run.
-3. Delete `tests/e2e/full-campaign-run.local.mjs` unless retention was
-   requested.
-4. Run `git status --short`.
-5. Confirm that no generated screenshot, log, or build output was added to the
+3. Run `git status --short`.
+4. Confirm that no generated screenshot, log, or build output was added to the
    repository.
-6. Verify every path listed in `REPORT.md` exists.
-7. Verify the required screenshots, `run.json`, `REPORT.md`, and
+5. Verify every path listed in `REPORT.md` exists.
+6. Verify the required screenshots, `run.json`, `REPORT.md`, and
    `browser-errors.log` exist and are non-empty.
+7. Run `npm run test:e2e:validate -- <artifact-directory>`.
 8. Return the absolute artifact directory and a concise result summary.
 
 ## Copyable assignment for an execution agent
@@ -691,7 +700,8 @@ Use this prompt when delegating the run:
 > direct chapter initialization, mutate Zustand state, patch timers, skip a
 > defeat, or modify production code. Use visible UI for campaign/dialogue/shop/
 > save/outro flows and only the permitted public battlefield actions when
-> canvas input is impractical. Store every artifact under a unique
+> canvas input is impractical. Do not rewrite the runner; execute
+> `npm run test:e2e:full`. Store every artifact under a unique
 > `/tmp/embers-e2e-<timestamp>/` directory, produce both `run.json` and
-> `REPORT.md`, clean up the temporary driver, and report the absolute artifact
-> path. A partial run must be reported as failed-incomplete, not passed.
+> `REPORT.md`, validate the artifact directory, and report its absolute path. A
+> partial run must be reported as failed-incomplete, not passed.

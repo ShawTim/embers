@@ -110,6 +110,8 @@ npm run preview
 | `npm run test:watch` | Run Vitest in watch mode |
 | `npm run test:e2e:final` | Verify the ch20 victory, epilogue, replay, and title flow against the development server |
 | `npm run test:e2e:campaign` | Verify that the real Next Chapter UI preserves unit progression |
+| `npm run test:e2e:full` | Run the reusable ch01–ch20 campaign acceptance driver |
+| `npm run test:e2e:validate -- <dir>` | Validate an existing full-campaign artifact directory |
 
 ## Project structure
 
@@ -221,6 +223,23 @@ The two npm E2E commands are focused regression checks. They do not replace a
 real full-campaign acceptance run. See
 [`E2E_PLAYTHROUGH_GUIDE.md`](E2E_PLAYTHROUGH_GUIDE.md) before delegating or
 running a complete campaign playthrough.
+
+Run the reusable full-campaign driver while the development server is active:
+
+```bash
+npm run test:e2e:full
+```
+
+The driver writes screenshots, `run.json`, `REPORT.md`, and browser errors to a
+unique `/tmp/embers-e2e-*` directory. Use `E2E_MAX_CHAPTERS=1` for a limited
+runner smoke check; limited runs are reported as `limited-pass`, never as a
+full acceptance pass.
+
+Useful runner options include `E2E_MAX_ATTEMPTS`, `E2E_MAX_TURNS`,
+`E2E_SPEED`, `E2E_HEADLESS`, `E2E_OUTPUT_DIR`, and `BASE_URL`. The runner
+creates a visible manual checkpoint at each chapter start, uses autosave for
+tactical defeat retries, and uses the manual checkpoint when a critical
+support casualty requires a full chapter retry.
 
 ## Localization
 
